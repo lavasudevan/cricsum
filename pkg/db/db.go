@@ -84,13 +84,15 @@ func GetPlayer() (map[string]int, map[int]string) {
 	var teamname string
 	nameMap := make(map[string]int)
 	idMap := make(map[int]string)
+	key := ""
 	for rows.Next() {
 		err = rows.Scan(&uid, &playername, &teamname)
 		checkErr(err)
-		nameMap[playername] = uid
-		idMap[uid] = playername
+		key = playername + "/" + teamname
+		nameMap[key] = uid
+		idMap[uid] = key
 
-		fmt.Printf("%d %s", uid, playername)
+		//fmt.Printf("%d %s", uid, playername)
 	}
 
 	rows.Close() //good habit to close
@@ -112,9 +114,9 @@ func updateIndex(itype string, id int) {
 	fmt.Println(stmt)
 	checkErr(err)
 }
-func insertGame(gamedate string, inn1id int, inn2id int) {
+func insertGame(tx *sql.Tx, gamedate string, inn1id int, inn2id int) {
 	stmt := fmt.Sprintf("insert into game (date, innings1_id, innings2_id) values ('%s',%d,%d) ", gamedate, inn1id, inn2id)
-	_, err := dba.Exec(stmt)
+	_, err := tx.Exec(stmt)
 	fmt.Println(stmt)
 	checkErr(err)
 }
@@ -135,49 +137,69 @@ func checkGameExist(gameDate string) int {
 	}
 }
 
-func verifyPlayerExist(inn parser.Innings) []string {
+func verifyDuplicateBowlers(bowl map[int]parser.Bowling) []string {
+	nameMap := make(map[string]string)
+	var dupNames []string
+
+	for _, v := range bowl {
+		_, ok := nameMap[v.Name]
+		if ok == true {
+			dupNames = append(dupNames, v.Name)
+		} else {
+			nameMap[v.Name] = v.Name
+
+		}
+	}
+	return dupNames
+}
+func verifyPlayerExist(inn parser.Innings, fieldingTeam string) []string {
 	var missingPlayers []string
+	var key string
 	for _, v := range inn.Bat {
-		_, e := mPlayerByName[v.Name]
+		key = v.Name + "/" + inn.TeamName
+		_, e := mPlayerByName[key]
 		if e == false && len(v.Name) > 0 {
-			missingPlayers = append(missingPlayers, v.Name)
+			missingPlayers = append(missingPlayers, key)
 		}
-		_, e = mPlayerByName[v.FielerName]
+		key = v.FielerName + "/" + fieldingTeam
+		_, e = mPlayerByName[key]
 		if e == false && len(v.FielerName) > 0 {
-			missingPlayers = append(missingPlayers, v.FielerName)
+			missingPlayers = append(missingPlayers, key)
 		}
-		_, e = mPlayerByName[v.BowlerName]
+		key = v.BowlerName + "/" + fieldingTeam
+		_, e = mPlayerByName[key]
 		if e == false && len(v.BowlerName) > 0 {
-			missingPlayers = append(missingPlayers, v.BowlerName)
+			missingPlayers = append(missingPlayers, key)
 		}
 	}
 
 	for _, v := range inn.Bowl {
-		_, e := mPlayerByName[v.Name]
+		key = v.Name + "/" + fieldingTeam
+		_, e := mPlayerByName[key]
 		if e == false && len(v.Name) > 0 {
-			missingPlayers = append(missingPlayers, v.Name)
+			missingPlayers = append(missingPlayers, key)
 		}
 	}
 	return missingPlayers
 }
-func insertInnings(innid int, inn parser.Innings) {
+func insertInnings(tx *sql.Tx, innid int, inn parser.Innings, bowlingTeamName string) {
 	for _, v := range inn.Bat {
-		plid := mPlayerByName[v.Name]
-		flid := mPlayerByName[v.FielerName]
-		blid := mPlayerByName[v.BowlerName]
+		plid := mPlayerByName[v.Name+"/"+inn.TeamName]
+		flid := mPlayerByName[v.FielerName+"/"+bowlingTeamName]
+		blid := mPlayerByName[v.BowlerName+"/"+bowlingTeamName]
 		stmt := fmt.Sprintf("insert into innings (id,player_id, runs_scored,fielder_id, how_out,bowler_id) values (%d,%d,%d,%d,'%s',%d)",
 			innid, plid, v.RunsScored, flid, v.HowOut, blid)
 		fmt.Println(stmt)
-		_, err := dba.Exec(stmt)
+		_, err := tx.Exec(stmt)
 		checkErr(err)
 		//fmt.Printf("key %d batsnmen name %s id %d \n", id, v.Name, plid)
 	}
 	for _, v := range inn.Bowl {
-		plid := mPlayerByName[v.Name]
+		plid := mPlayerByName[v.Name+"/"+bowlingTeamName]
 		stmt := fmt.Sprintf("insert into bowl_innings (id,player_id, overs_bowled, maiden, runs, wickets ) values (%d,%d,%f,%d,%d,%d)",
 			innid, plid, v.OversBowled, v.Maiden, v.RunsConceded, v.Wickets)
 		fmt.Println(stmt)
-		_, err := dba.Exec(stmt)
+		_, err := tx.Exec(stmt)
 		checkErr(err)
 		//fmt.Printf("key %d batsnmen name %s id %d \n", id, v.Name, plid)
 	}
@@ -344,35 +366,46 @@ func UpdateGame(game parser.Game) int {
 		return 0
 	}
 	refreshPlayer()
-	mp := verifyPlayerExist(game.Team1)
-	mp1 := verifyPlayerExist(game.Team2)
+	mp := verifyPlayerExist(game.Team1, game.Team2.TeamName)
+	mp1 := verifyPlayerExist(game.Team2, game.Team1.TeamName)
 	er := 0
 	if len(mp) > 0 {
-		fmt.Printf("*** missing players %s", mp)
+		fmt.Printf("*** missing players %s\n", mp)
 		er = er + 1
 	}
 	if len(mp1) > 0 {
-		fmt.Printf("*** missing players %s", mp1)
+		fmt.Printf("*** missing players %s\n", mp1)
 		er = er + 1
 	}
+	dupNames := verifyDuplicateBowlers(game.Team2.Bowl)
+	if len(dupNames) > 0 {
+		fmt.Printf("*** duplicate bowlers in %s %s\n", game.Team1.TeamName, dupNames)
+		er = er + 1
+	}
+	dupNames = verifyDuplicateBowlers(game.Team1.Bowl)
+	if len(dupNames) > 0 {
+		fmt.Printf("*** duplicate bowlers in %s %s\n", game.Team2.TeamName, dupNames)
+		er = er + 1
+	}
+
 	if er > 0 {
 		return 0
 	}
+	//vln
+	//return 0
 
 	tx, err := dba.Begin()
+	defer tx.Rollback()
 	checkErr(err)
 
-	//refreshPlayer()
 	innid := getId("bat") + 1
-	fmt.Printf(" bat id %d\n", innid)
+	//fmt.Printf(" bat id %d\n", innid)
 	bowlInnId := getId("bowl") + 1
-	fmt.Printf(" bowl id %d\n", innid)
-	fmt.Printf(" %d %d ", innid, bowlInnId)
-	insertInnings(innid, game.Team1)
-	insertInnings(bowlInnId, game.Team2)
-	//updateIndex("bat", innid)
-	//updateIndex("bowl", bowlInnId)
-	insertGame(game.GameDate, innid, bowlInnId)
+	//fmt.Printf(" bowl id %d\n", innid)
+	fmt.Printf(" bat id %d bowl id %d ", innid, bowlInnId)
+	insertInnings(tx, innid, game.Team1, game.Team2.TeamName)
+	insertInnings(tx, bowlInnId, game.Team2, game.Team1.TeamName)
+	insertGame(tx, game.GameDate, innid, bowlInnId)
 
 	tx.Commit()
 

@@ -24,6 +24,7 @@ type Bowling struct {
 	Wickets      int
 }
 type Innings struct {
+	TeamName    string //name of the team batting
 	Bat         map[int]Batting
 	Bowl        map[int]Bowling
 	Total       int
@@ -72,6 +73,30 @@ func procBatting(line string) Batting {
 	}
 	return bg
 }
+func getTeamName(commentLine string) string {
+	/*
+		the file has the following format
+		==
+		#inn1/team1name,
+		batting team
+		#blg2/team2name
+		bowling team
+		#inn2/team2name
+		#blg1/team1name
+		==
+		if no team is specified, it is assumed to be phantom
+	*/
+	tokens := strings.Split(commentLine, ",")
+	tempstr := tokens[0]
+	tokens = strings.Split(tempstr, "/")
+	teamName := ""
+	if len(tokens) > 1 {
+		teamName = tokens[1]
+	} else {
+		teamName = "phantom"
+	}
+	return teamName
+}
 
 //
 func ReadLine(filename string) Game {
@@ -110,6 +135,13 @@ func ReadLine(filename string) Game {
 		if strings.HasPrefix(line, "#") == true {
 			hashCount += 1
 			idx = 0
+			if hashCount == 1 {
+				inn1.TeamName = getTeamName(line)
+			}
+			if hashCount == 2 {
+				inn2.TeamName = getTeamName(line)
+			}
+
 			continue
 		}
 		if len(line) == 0 {

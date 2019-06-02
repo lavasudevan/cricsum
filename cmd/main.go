@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/cricsum/pkg/db"
 	"github.com/cricsum/pkg/parser"
 )
 
-func getSummary() {
+func getSummary(teamname string) {
 	rs := db.GetSummary()
 	fmt.Printf("\n%-15s,%-15s,%-6s,%-7s,%-7s,%7s,,%6s,%5s,%6s,%7s,%8s,%9s,%-15s\n",
 		"player", "innings_played", "notout", "runs", "average", "highest",
@@ -24,10 +25,16 @@ func getSummary() {
 
 	for _, name := range keys {
 		v := rs[name]
+		tokens := strings.Split(name, "/")
+		plname := tokens[0]
+		tname := tokens[1]
+		if tname != teamname {
+			continue
+		}
 		fmt.Printf("%-15s,%-15d,%s,%-7d,%7.2f,%7d,,%6.1f,%5s,%6s,%7s,%8.2f,%9s,%-15s\n",
-			name, v.InningsPlayed, numberFormat(v.NotOut), v.RunsScored, v.Average, v.Highest, v.OversBowled,
+			plname, v.InningsPlayed, numberFormat(v.NotOut), v.RunsScored, v.Average, v.Highest, v.OversBowled,
 			numberFormat(v.RunsConceded), numberFormat(v.Maiden), numberFormat(v.Wickets), v.RunsPerOver,
-			numberFormat(v.Dismissal), name)
+			numberFormat(v.Dismissal), plname)
 	}
 }
 func numberFormat(i int) string {
@@ -44,7 +51,7 @@ func main() {
 	flag.StringVar(&file, "scorefile", "", "a string")
 	flag.Parse()
 	if command == "summary" {
-		getSummary()
+		getSummary("phantom")
 	}
 	if command == "upload" {
 		gm := parser.ReadLine(file)
