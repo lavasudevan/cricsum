@@ -31,9 +31,11 @@ type Innings struct {
 	OversPlayed float32
 }
 type Game struct {
-	GameDate string
-	Team1    Innings
-	Team2    Innings
+	GameDate   string
+	Innings1Id int
+	Innings2Id int
+	Team1      Innings
+	Team2      Innings
 }
 
 func procBowling(line string) Bowling {

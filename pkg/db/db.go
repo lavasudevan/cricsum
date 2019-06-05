@@ -72,6 +72,18 @@ type Summary struct {
 	RunsPerOver   float32
 }
 
+type Details struct {
+	Name         string
+	Id           int
+	Date         string
+	RunsScored   int
+	HowOut       string
+	OversBowled  float32
+	RunsConceded int
+	Maiden       int
+	Wickets      int
+}
+
 //
 func GetPlayer() (map[string]int, map[int]string) {
 	openDb()
@@ -356,6 +368,68 @@ func GetSummary() map[string]Summary {
 	}
 	return rv
 }
+func makeKey(playerid int, date string) string {
+	return fmt.Sprintf("%d/%s", playerid, date)
+}
+func GetDetails() map[string]Details {
+	openDb()
+	refreshPlayer()
+	var inn1id, inn2id int
+	var date string
+	rows, err := dba.Query("select date,innings1_id,innings2_id from game ")
+	checkErr(err)
+	dateMap := make(map[int]string)
+	for rows.Next() {
+		err = rows.Scan(&date, &inn1id, &inn2id)
+		checkErr(err)
+		dateMap[inn1id] = date
+		dateMap[inn2id] = date
+	}
+
+	var id, pid, runs_scored int
+	var how_out string
+	rows, err = dba.Query("select id,player_id,runs_scored,how_out from innings ")
+	checkErr(err)
+	detmap := make(map[string]Details)
+	var ky string
+	for rows.Next() {
+		err = rows.Scan(&id, &pid, &runs_scored, &how_out)
+		checkErr(err)
+		var det Details
+		ky = makeKey(pid, dateMap[id])
+		det.Id = id
+		det.RunsScored = runs_scored
+		det.HowOut = how_out
+		det.Id = pid
+		det.Date = dateMap[id]
+		det.Name = mPlayerById[pid]
+		detmap[ky] = det
+	}
+
+	var overs_bowled float32
+	var maiden, runs, wickets int
+	rows, err = dba.Query("select id,player_id,overs_bowled,maiden,runs,wickets from bowl_innings")
+	checkErr(err)
+	for rows.Next() {
+		err = rows.Scan(&id, &pid, &overs_bowled, &maiden, &runs, &wickets)
+		checkErr(err)
+		var det Details
+		ky = makeKey(pid, dateMap[id])
+		det = detmap[ky]
+		det.OversBowled = overs_bowled
+		det.RunsConceded = runs
+		det.Maiden = maiden
+		det.Wickets = wickets
+
+		if len(det.Name) == 0 {
+			det.Name = mPlayerById[pid]
+			det.Date = dateMap[id]
+			det.HowOut = "dnb"
+		}
+		detmap[ky] = det
+	}
+	return detmap
+}
 
 //
 func UpdateGame(game parser.Game) int {
@@ -367,14 +441,14 @@ func UpdateGame(game parser.Game) int {
 	}
 	refreshPlayer()
 	mp := verifyPlayerExist(game.Team1, game.Team2.TeamName)
-	mp1 := verifyPlayerExist(game.Team2, game.Team1.TeamName)
 	er := 0
 	if len(mp) > 0 {
 		fmt.Printf("*** missing players %s\n", mp)
 		er = er + 1
 	}
-	if len(mp1) > 0 {
-		fmt.Printf("*** missing players %s\n", mp1)
+	mp = verifyPlayerExist(game.Team2, game.Team1.TeamName)
+	if len(mp) > 0 {
+		fmt.Printf("*** missing players %s\n", mp)
 		er = er + 1
 	}
 	dupNames := verifyDuplicateBowlers(game.Team2.Bowl)
@@ -398,14 +472,15 @@ func UpdateGame(game parser.Game) int {
 	defer tx.Rollback()
 	checkErr(err)
 
-	innid := getId("bat") + 1
+	inn1id := getId("bat") + 1
 	//fmt.Printf(" bat id %d\n", innid)
-	bowlInnId := getId("bowl") + 1
+	inn2id := inn1id + 1
+	//bowlInnId := getId("bowl") + 1
 	//fmt.Printf(" bowl id %d\n", innid)
-	fmt.Printf(" bat id %d bowl id %d ", innid, bowlInnId)
-	insertInnings(tx, innid, game.Team1, game.Team2.TeamName)
-	insertInnings(tx, bowlInnId, game.Team2, game.Team1.TeamName)
-	insertGame(tx, game.GameDate, innid, bowlInnId)
+	fmt.Printf(" inn1 id %d inn2 id %d ", inn1id, inn2id)
+	insertInnings(tx, inn1id, game.Team1, game.Team2.TeamName)
+	insertInnings(tx, inn2id, game.Team2, game.Team1.TeamName)
+	insertGame(tx, game.GameDate, inn1id, inn2id)
 
 	tx.Commit()
 

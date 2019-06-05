@@ -37,6 +37,26 @@ func getSummary(teamname string) {
 			numberFormat(v.Dismissal), plname)
 	}
 }
+
+func getDetails() {
+	rs := db.GetDetails()
+	fmt.Println("Name,date,Runs,howout,overs,maiden,runsconceded,wickets")
+
+	var keys []string
+	for k := range rs {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		v := rs[k]
+		tokens := strings.Split(v.Name, "/")
+		if tokens[1] != "phantom" {
+			continue
+		}
+		fmt.Printf("%s,%s,%0d,%s,%6.2f,%d,%d,%d\n",
+			tokens[0], v.Date, v.RunsScored, v.HowOut, v.OversBowled, v.Maiden, v.RunsConceded, v.Wickets)
+	}
+}
 func numberFormat(i int) string {
 	if i == 0 {
 		return ""
@@ -52,6 +72,9 @@ func main() {
 	flag.Parse()
 	if command == "summary" {
 		getSummary("phantom")
+	}
+	if command == "details" {
+		getDetails()
 	}
 	if command == "upload" {
 		gm := parser.ReadLine(file)
