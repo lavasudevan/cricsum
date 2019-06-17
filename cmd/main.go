@@ -13,9 +13,9 @@ import (
 
 func getSummary(teamname string) {
 	rs := db.GetSummary()
-	fmt.Printf("\n%-15s,%-15s,%-6s,%-7s,%-7s,%7s,,%6s,%5s,%6s,%7s,%8s,%9s,%-15s\n",
+	fmt.Printf("\n%-15s,%-15s,%-6s,%-7s,%-7s,%7s,,%6s,%5s,%6s,%7s,%8s,%9s,%s,%-15s\n",
 		"player", "innings_played", "notout", "runs", "average", "highest",
-		"Overs", "Runs", "maiden", "wickets", "RPO", "Dismissal", "player")
+		"Overs", "Runs", "maiden", "wickets", "RPO", "Dismissal", "dropped Catches", "player")
 
 	keys := make([]string, 0, len(rs))
 	for k, _ := range rs {
@@ -31,16 +31,16 @@ func getSummary(teamname string) {
 		if tname != teamname {
 			continue
 		}
-		fmt.Printf("%-15s,%-15d,%s,%-7d,%7.2f,%7d,,%6.1f,%5s,%6s,%7s,%8.2f,%9s,%-15s\n",
+		fmt.Printf("%-15s,%-15d,%s,%-7d,%7.2f,%7d,,%6.1f,%5s,%6s,%7s,%8.2f,%9s,%d,%-15s\n",
 			plname, v.InningsPlayed, numberFormat(v.NotOut), v.RunsScored, v.Average, v.Highest, v.OversBowled,
 			numberFormat(v.RunsConceded), numberFormat(v.Maiden), numberFormat(v.Wickets), v.RunsPerOver,
-			numberFormat(v.Dismissal), plname)
+			numberFormat(v.Dismissal), v.DroppedCatches, plname)
 	}
 }
 
 func getDetails() {
 	rs := db.GetDetails()
-	fmt.Println("Name,date,Runs,howout,overs,maiden,runsconceded,wickets")
+	fmt.Println("Name,date,Runs,howout,dismissal,catchdropped,overs,maiden,runsconceded,wickets")
 
 	var keys []string
 	for k := range rs {
@@ -50,11 +50,14 @@ func getDetails() {
 	for _, k := range keys {
 		v := rs[k]
 		tokens := strings.Split(v.Name, "/")
+		if len(tokens) == 1 {
+			fmt.Printf("zero")
+		}
 		if tokens[1] != "phantom" {
 			continue
 		}
-		fmt.Printf("%s,%s,%0d,%s,%6.2f,%d,%d,%d\n",
-			tokens[0], v.Date, v.RunsScored, v.HowOut, v.OversBowled, v.Maiden, v.RunsConceded, v.Wickets)
+		fmt.Printf("%s,%s,%0d,%s,%d,%d,%6.2f,%d,%d,%d\n",
+			tokens[0], v.Date, v.RunsScored, v.HowOut, v.Dismissal, v.DroppedCatches, v.OversBowled, v.Maiden, v.RunsConceded, v.Wickets)
 	}
 }
 func numberFormat(i int) string {
@@ -66,12 +69,16 @@ func numberFormat(i int) string {
 }
 
 func main() {
-	var command, file string
+	var command, file, date string
 	flag.StringVar(&command, "command", "", "a string")
 	flag.StringVar(&file, "scorefile", "", "a string")
+	flag.StringVar(&date, "date", "", "date string in yyyymmdd format")
 	flag.Parse()
 	if command == "summary" {
 		getSummary("phantom")
+	}
+	if command == "remove" {
+		db.RemoveGame(date)
 	}
 	if command == "details" {
 		getDetails()
