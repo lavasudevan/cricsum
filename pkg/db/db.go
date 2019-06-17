@@ -58,30 +58,33 @@ func getId(inningsType string) int {
 }
 
 type Summary struct {
-	Name          string
-	InningsPlayed int
-	NotOut        int
-	RunsScored    int
-	Average       float32
-	Highest       int
-	Dismissal     int
-	OversBowled   float32
-	RunsConceded  int
-	Maiden        int
-	Wickets       int
-	RunsPerOver   float32
+	Name           string
+	InningsPlayed  int
+	NotOut         int
+	RunsScored     int
+	Average        float32
+	Highest        int
+	Dismissal      int
+	DroppedCatches int
+	OversBowled    float32
+	RunsConceded   int
+	Maiden         int
+	Wickets        int
+	RunsPerOver    float32
 }
 
 type Details struct {
-	Name         string
-	Id           int
-	Date         string
-	RunsScored   int
-	HowOut       string
-	OversBowled  float32
-	RunsConceded int
-	Maiden       int
-	Wickets      int
+	Name           string
+	Id             int
+	Date           string
+	RunsScored     int
+	Dismissal      int
+	DroppedCatches int
+	HowOut         string
+	OversBowled    float32
+	RunsConceded   int
+	Maiden         int
+	Wickets        int
 }
 
 //
@@ -126,15 +129,19 @@ func updateIndex(itype string, id int) {
 	fmt.Println(stmt)
 	checkErr(err)
 }
-func insertGame(tx *sql.Tx, gamedate string, inn1id int, inn2id int) {
-	stmt := fmt.Sprintf("insert into game (date, innings1_id, innings2_id) values ('%s',%d,%d) ", gamedate, inn1id, inn2id)
+func insertGame(tx *sql.Tx, gamedate string, inn1id int, inn2id int, wonby string,
+	inn1total int, inn1overs float32,
+	inn2total int, inn2overs float32) {
+	stmt := fmt.Sprintf("insert into game (date, innings1_id, innings2_id,wonby,team1_score,team1_overs,team2_score,team2_overs) "+
+		"values ('%s',%d,%d,'%s',%d,%f,%d,%f) ",
+		gamedate, inn1id, inn2id, wonby, inn1total, inn1overs, inn2total, inn2overs)
 	_, err := tx.Exec(stmt)
 	fmt.Println(stmt)
 	checkErr(err)
 }
 func checkGameExist(gameDate string) int {
 	stmt := fmt.Sprintf("select count(*) from game where date like '%s'", gameDate)
-
+	openDb()
 	fmt.Println(stmt)
 	row := dba.QueryRow(stmt)
 	var cnt int
@@ -159,10 +166,20 @@ func verifyDuplicateBowlers(bowl map[int]parser.Bowling) []string {
 			dupNames = append(dupNames, v.Name)
 		} else {
 			nameMap[v.Name] = v.Name
-
 		}
 	}
 	return dupNames
+}
+func verifyDismissal(inn parser.Innings) []string {
+	var howout []string
+	for _, v := range inn.Bat {
+		if v.HowOut == "no" || v.HowOut == "b" || v.HowOut == "c" || v.HowOut == "dnb" || v.HowOut == "st" || v.HowOut == "ro" {
+
+		} else {
+			howout = append(howout, v.HowOut)
+		}
+	}
+	return howout
 }
 func verifyPlayerExist(inn parser.Innings, fieldingTeam string) []string {
 	var missingPlayers []string
@@ -194,6 +211,19 @@ func verifyPlayerExist(inn parser.Innings, fieldingTeam string) []string {
 	}
 	return missingPlayers
 }
+func verifyFielders(droppedCatches []string, teamname string) []string {
+	var missingPlayers []string
+	var key string
+	for _, plname := range droppedCatches {
+		key = plname + "/" + teamname
+		_, e := mPlayerByName[key]
+		if e == false && len(plname) > 0 {
+			missingPlayers = append(missingPlayers, key)
+		}
+	}
+	return missingPlayers
+}
+
 func insertInnings(tx *sql.Tx, innid int, inn parser.Innings, bowlingTeamName string) {
 	for _, v := range inn.Bat {
 		plid := mPlayerByName[v.Name+"/"+inn.TeamName]
@@ -214,6 +244,19 @@ func insertInnings(tx *sql.Tx, innid int, inn parser.Innings, bowlingTeamName st
 		_, err := tx.Exec(stmt)
 		checkErr(err)
 		//fmt.Printf("key %d batsnmen name %s id %d \n", id, v.Name, plid)
+	}
+}
+
+func insertDroppedCatches(tx *sql.Tx, innid int, teamName string, droppedCatches []string) {
+	var key string
+	for _, plname := range droppedCatches {
+		key = plname + "/" + teamName
+		plid := mPlayerByName[key]
+		stmt := fmt.Sprintf("insert into dropped_catches (innings_id,player_id ) values (%d,%d)",
+			innid, plid)
+		fmt.Println(stmt)
+		_, err := tx.Exec(stmt)
+		checkErr(err)
 	}
 }
 
@@ -347,6 +390,16 @@ func GetSummary() map[string]Summary {
 		idMap[pid] = sm
 	}
 
+	rows, err = dba.Query("select player_id, count(*) from dropped_catches group by player_id ;")
+	checkErr(err)
+	for rows.Next() {
+		err = rows.Scan(&pid, &cntfeilder)
+		checkErr(err)
+		sm := idMap[pid]
+		sm.DroppedCatches = cntfeilder
+		idMap[pid] = sm
+	}
+
 	rv := make(map[string]Summary)
 	for id, v := range idMap {
 		var denom float32
@@ -428,7 +481,101 @@ func GetDetails() map[string]Details {
 		}
 		detmap[ky] = det
 	}
+
+	var cntDismisal int
+	rows, err = dba.Query("select id,fielder_id, count(fielder_id) from innings where fielder_id > 0 group by id,fielder_id")
+	checkErr(err)
+	for rows.Next() {
+		err = rows.Scan(&id, &pid, &cntDismisal)
+		checkErr(err)
+		var det Details
+		ky = makeKey(pid, dateMap[id])
+		det = detmap[ky]
+		//accumulating becase we may have common fielder some times when playing within phantoms
+		det.Dismissal += cntDismisal
+		if len(det.Name) == 0 {
+			det.Name = mPlayerById[pid]
+			det.Date = dateMap[id]
+			det.HowOut = "dnb"
+		}
+		detmap[ky] = det
+	}
+
+	var cntCatchDropped int
+	rows, err = dba.Query("select innings_id,player_id, count(player_id) from dropped_catches group by innings_id,player_id;")
+	checkErr(err)
+	for rows.Next() {
+		err = rows.Scan(&id, &pid, &cntCatchDropped)
+		checkErr(err)
+		var det Details
+		ky = makeKey(pid, dateMap[id])
+		det = detmap[ky]
+		//accumulating becase we may have common fielder some times when playing within phantoms
+		det.DroppedCatches += cntCatchDropped
+		if len(det.Name) == 0 {
+			det.Name = mPlayerById[pid]
+			det.Date = dateMap[id]
+			det.HowOut = "dnb"
+		}
+		detmap[ky] = det
+	}
+
 	return detmap
+}
+
+func getInningsId(gameDate string) (int, int, int) {
+	var stmt string
+	stmt = fmt.Sprintf("select id,innings1_id,innings2_id FROM game where date like '%s'", gameDate)
+
+	row := dba.QueryRow(stmt)
+	var gameid, inn1id, inn2id int
+
+	switch err := row.Scan(&gameid, &inn1id, &inn2id); err {
+	case sql.ErrNoRows:
+		//		fmt.Println("No rows were returned!")
+		return 0, 0, 0
+	case nil:
+		return gameid, inn1id, inn2id
+	default:
+		return 0, 0, 0
+	}
+}
+
+//
+func RemoveGame(gameDate string) int {
+	if checkGameExist(gameDate) <= 0 {
+		fmt.Println("*** game doesnt exist")
+		return 0
+	}
+	tx, err := dba.Begin()
+	gameid, inn1id, inn2id := getInningsId(gameDate)
+	stmt := fmt.Sprintf("delete from dropped_catches where innings_id in (%d,%d)",
+		inn1id, inn2id)
+	fmt.Println(stmt)
+	_, err = tx.Exec(stmt)
+	checkErr(err)
+
+	stmt = fmt.Sprintf("delete from innings where id in (%d,%d)",
+		inn1id, inn2id)
+	fmt.Println(stmt)
+	_, err = tx.Exec(stmt)
+	checkErr(err)
+
+	stmt = fmt.Sprintf("delete from bowl_innings where id in (%d,%d)",
+		inn1id, inn2id)
+	fmt.Println(stmt)
+	_, err = tx.Exec(stmt)
+	checkErr(err)
+
+	stmt = fmt.Sprintf("delete from game where id = %d", gameid)
+	fmt.Println(stmt)
+	_, err = tx.Exec(stmt)
+	checkErr(err)
+
+	defer tx.Rollback()
+	tx.Commit()
+
+	return 0
 }
 
 //
@@ -461,12 +608,43 @@ func UpdateGame(game parser.Game) int {
 		fmt.Printf("*** duplicate bowlers in %s %s\n", game.Team2.TeamName, dupNames)
 		er = er + 1
 	}
+	ho := verifyDismissal(game.Team1)
+	if len(ho) > 0 {
+		fmt.Printf("*** unknown dismissal type  %s %s\n", game.Team1.TeamName, ho)
+		er = er + 1
+	}
+	ho = verifyDismissal(game.Team2)
+	if len(ho) > 0 {
+		fmt.Printf("*** unknown dismissal type  %s %s\n", game.Team2.TeamName, ho)
+		er = er + 1
+	}
+	if game.WonBy == "team1" || game.WonBy == "team2" || game.WonBy == "phantom" || game.WonBy == "tesla" {
+	} else {
+		fmt.Printf("*** team wonby is not right %s \n", game.WonBy)
+		er = er + 1
+	}
+	if game.Team1.Total == 0 || game.Team2.Total == 0 {
+		fmt.Printf("*** missing total \n")
+		er = er + 1
+	}
+	if game.Team1.OversPlayed == 0 || game.Team2.OversPlayed == 0 {
+		fmt.Printf("*** missing overs \n")
+		er = er + 1
+	}
+	mp = verifyFielders(game.Team1.DroppedCatches, game.Team2.TeamName)
+	if len(mp) > 0 {
+		fmt.Printf("*** missing players %s\n", mp)
+		er = er + 1
+	}
+	mp = verifyFielders(game.Team2.DroppedCatches, game.Team1.TeamName)
+	if len(mp) > 0 {
+		fmt.Printf("*** missing players %s\n", mp)
+		er = er + 1
+	}
 
 	if er > 0 {
 		return 0
 	}
-	//vln
-	//return 0
 
 	tx, err := dba.Begin()
 	defer tx.Rollback()
@@ -480,7 +658,11 @@ func UpdateGame(game parser.Game) int {
 	fmt.Printf(" inn1 id %d inn2 id %d ", inn1id, inn2id)
 	insertInnings(tx, inn1id, game.Team1, game.Team2.TeamName)
 	insertInnings(tx, inn2id, game.Team2, game.Team1.TeamName)
-	insertGame(tx, game.GameDate, inn1id, inn2id)
+	insertDroppedCatches(tx, inn1id, game.Team2.TeamName, game.Team1.DroppedCatches)
+	insertDroppedCatches(tx, inn2id, game.Team1.TeamName, game.Team2.DroppedCatches)
+	insertGame(tx, game.GameDate, inn1id, inn2id, game.WonBy,
+		game.Team1.Total, game.Team1.OversPlayed,
+		game.Team2.Total, game.Team2.OversPlayed)
 
 	tx.Commit()
 
