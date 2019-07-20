@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -67,7 +68,13 @@ func numberFormat(i int) string {
 		return strconv.Itoa(i)
 	}
 }
-
+func usage() {
+	fmt.Println("--command=remove --date=yyyymmdd")
+	fmt.Println("--command=upload --scorefile=yyyymmdd.csv")
+	fmt.Println("--command=summary")
+	fmt.Println("--command=details")
+	os.Exit(1)
+}
 func main() {
 	var command, file, date string
 	flag.StringVar(&command, "command", "", "a string")
@@ -76,17 +83,19 @@ func main() {
 	flag.Parse()
 	if command == "summary" {
 		getSummary("phantom")
-	}
-	if command == "remove" {
+	} else if command == "remove" {
+		if date == "" {
+			usage()
+		}
 		db.RemoveGame(date)
-	}
-	if command == "details" {
+	} else if command == "details" {
 		getDetails()
-	}
-	if command == "upload" {
+	} else if command == "upload" {
 		gm := parser.ReadLine(file)
 		fmt.Printf("date of file %s\n", gm.GameDate)
 		db.UpdateGame(gm)
+	} else {
+		usage()
 	}
 
 }
