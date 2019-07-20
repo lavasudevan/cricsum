@@ -49,3 +49,8 @@ insert into player (name,team) values ("ratna","tesla");
 insert into player (name,team) values ("palani","tesla");
 insert into player (name,team) values ("amarish","phantom");
 insert into player (name,team) values ("krish","phantom");
+insert into player (name,team) values ("raghu","phantom");
+insert into player (name,team) values ("snehith","phantom");
+insert into player (name,team) values ("prakash","tesla");
+insert into player (name,team) values ("manish","tesla");
+insert into player (name,team) values ("sanjaygulati","phantom");
