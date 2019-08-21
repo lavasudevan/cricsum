@@ -170,6 +170,30 @@ func verifyDuplicateBowlers(bowl map[int]parser.Bowling) []string {
 	}
 	return dupNames
 }
+func verifyDuplicateBatsman(bat map[int]parser.Batting) []string {
+	nameMap := make(map[string]string)
+	var dupNames []string
+
+	for _, v := range bat {
+		_, ok := nameMap[v.Name]
+		if ok == true {
+			dupNames = append(dupNames, v.Name)
+		} else {
+			nameMap[v.Name] = v.Name
+		}
+	}
+	return dupNames
+}
+
+func verifyRunsScored(inn parser.Innings) int {
+	nzc := 0
+	for _, v := range inn.Bat {
+		if v.RunsScored > 0 {
+			nzc = nzc + 1
+		}
+	}
+	return nzc
+}
 func verifyDismissal(inn parser.Innings) []string {
 	var howout []string
 	for _, v := range inn.Bat {
@@ -598,7 +622,18 @@ func UpdateGame(game parser.Game) int {
 		fmt.Printf("*** missing players %s\n", mp)
 		er = er + 1
 	}
-	dupNames := verifyDuplicateBowlers(game.Team2.Bowl)
+	dupNames := verifyDuplicateBatsman(game.Team1.Bat)
+	if len(dupNames) > 0 {
+		fmt.Printf("*** duplicate batsman in %s %s\n", game.Team1.TeamName, dupNames)
+		er = er + 1
+	}
+	dupNames = verifyDuplicateBatsman(game.Team2.Bat)
+	if len(dupNames) > 0 {
+		fmt.Printf("*** duplicate batsman in %s %s\n", game.Team1.TeamName, dupNames)
+		er = er + 1
+	}
+
+	dupNames = verifyDuplicateBowlers(game.Team2.Bowl)
 	if len(dupNames) > 0 {
 		fmt.Printf("*** duplicate bowlers in %s %s\n", game.Team1.TeamName, dupNames)
 		er = er + 1
@@ -613,9 +648,17 @@ func UpdateGame(game parser.Game) int {
 		fmt.Printf("*** unknown dismissal type  %s %s\n", game.Team1.TeamName, ho)
 		er = er + 1
 	}
+	if verifyRunsScored(game.Team1) == 0 {
+		fmt.Printf("*** all bastman have 0 score team name %s\n", game.Team1.TeamName)
+		er = er + 1
+	}
 	ho = verifyDismissal(game.Team2)
 	if len(ho) > 0 {
 		fmt.Printf("*** unknown dismissal type  %s %s\n", game.Team2.TeamName, ho)
+		er = er + 1
+	}
+	if verifyRunsScored(game.Team2) == 0 {
+		fmt.Printf("*** all bastman have 0 score team name %s\n", game.Team2.TeamName)
 		er = er + 1
 	}
 	if game.WonBy == "team1" || game.WonBy == "team2" || game.WonBy == "phantom" || game.WonBy == "tesla" {
