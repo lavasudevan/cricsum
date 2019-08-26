@@ -445,8 +445,8 @@ func GetSummary() map[string]Summary {
 	}
 	return rv
 }
-func makeKey(playerid int, date string) string {
-	return fmt.Sprintf("%d/%s", playerid, date)
+func makeKey(playername string, date string) string {
+	return fmt.Sprintf("%s/%s", playername, date)
 }
 func GetDetails() map[string]Details {
 	openDb()
@@ -473,7 +473,7 @@ func GetDetails() map[string]Details {
 		err = rows.Scan(&id, &pid, &runs_scored, &how_out)
 		checkErr(err)
 		var det Details
-		ky = makeKey(pid, dateMap[id])
+		ky = makeKey(mPlayerById[pid], dateMap[id])
 		det.Id = id
 		det.RunsScored = runs_scored
 		det.HowOut = how_out
@@ -491,7 +491,7 @@ func GetDetails() map[string]Details {
 		err = rows.Scan(&id, &pid, &overs_bowled, &maiden, &runs, &wickets)
 		checkErr(err)
 		var det Details
-		ky = makeKey(pid, dateMap[id])
+		ky = makeKey(mPlayerById[pid], dateMap[id])
 		det = detmap[ky]
 		det.OversBowled = overs_bowled
 		det.RunsConceded = runs
@@ -513,7 +513,7 @@ func GetDetails() map[string]Details {
 		err = rows.Scan(&id, &pid, &cntDismisal)
 		checkErr(err)
 		var det Details
-		ky = makeKey(pid, dateMap[id])
+		ky = makeKey(mPlayerById[pid], dateMap[id])
 		det = detmap[ky]
 		//accumulating becase we may have common fielder some times when playing within phantoms
 		det.Dismissal += cntDismisal
@@ -532,7 +532,7 @@ func GetDetails() map[string]Details {
 		err = rows.Scan(&id, &pid, &cntCatchDropped)
 		checkErr(err)
 		var det Details
-		ky = makeKey(pid, dateMap[id])
+		ky = makeKey(mPlayerById[pid], dateMap[id])
 		det = detmap[ky]
 		//accumulating becase we may have common fielder some times when playing within phantoms
 		det.DroppedCatches += cntCatchDropped

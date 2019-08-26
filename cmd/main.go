@@ -43,6 +43,7 @@ func getDetails() {
 	rs := db.GetDetails()
 	fmt.Println("Name,date,Runs,howout,dismissal,catchdropped,overs,maiden,runsconceded,wickets")
 
+	//Key has the form playername/date
 	var keys []string
 	for k := range rs {
 		keys = append(keys, k)
