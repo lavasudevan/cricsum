@@ -58,19 +58,21 @@ func getId(inningsType string) int {
 }
 
 type Summary struct {
-	Name           string
-	InningsPlayed  int
-	NotOut         int
-	RunsScored     int
-	Average        float32
-	Highest        int
-	Dismissal      int
-	DroppedCatches int
-	OversBowled    float32
-	RunsConceded   int
-	Maiden         int
-	Wickets        int
-	RunsPerOver    float32
+	Name            string
+	InningsPlayed   int
+	NotOut          int
+	RunsScored      int
+	Average         float32
+	Highest         int
+	Dismissal       int
+	DroppedCatches  int
+	OversBowled     float32
+	RunsConceded    int
+	Maiden          int
+	Wickets         int
+	RunsPerOver     float32
+	BestWickets     int
+	BestWicketsRuns int
 }
 
 type Details struct {
@@ -421,6 +423,23 @@ func GetSummary() map[string]Summary {
 		checkErr(err)
 		sm := idMap[pid]
 		sm.DroppedCatches = cntfeilder
+		idMap[pid] = sm
+	}
+
+	rows, err = dba.Query("select player_id, max(wickets) from bowl_innings group by player_id order by max(wickets) desc")
+	var maxwickets int
+	for rows.Next() {
+		err = rows.Scan(&pid, &maxwickets)
+		checkErr(err)
+		sm := idMap[pid]
+		sm.BestWickets = maxwickets
+
+		stmt := fmt.Sprintf("select min(runs) from bowl_innings where player_id = %d and wickets = %d", pid, maxwickets)
+		row := dba.QueryRow(stmt)
+		var minruns int
+		row.Scan(&minruns)
+		sm.BestWicketsRuns = minruns
+		
 		idMap[pid] = sm
 	}
 
