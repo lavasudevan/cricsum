@@ -14,9 +14,9 @@ import (
 
 func getSummary(teamname string) {
 	rs := db.GetSummary()
-	fmt.Printf("\n%-15s,%-15s,%-6s,%-7s,%-7s,%7s,,%6s,%5s,%6s,%7s,%8s,%9s,%s,%-15s\n",
+	fmt.Printf("%-15s,%-15s,%-6s,%-7s,%-7s,%7s,,%6s,%5s,%6s,%7s,%8s,%9s,%s,%s,%-15s\n",
 		"player", "innings_played", "notout", "runs", "average", "highest",
-		"Overs", "Runs", "maiden", "wickets", "RPO", "Dismissal", "dropped Catches", "player")
+		"Overs", "Runs", "maiden", "wickets", "RPO", "Dismissal", "dropped Catches", "BBM", "player")
 
 	keys := make([]string, 0, len(rs))
 	for k, _ := range rs {
@@ -32,10 +32,10 @@ func getSummary(teamname string) {
 		if tname != teamname {
 			continue
 		}
-		fmt.Printf("%-15s,%-15d,%s,%-7d,%7.2f,%7d,,%6.1f,%5s,%6s,%7s,%8.2f,%9s,%d,%-15s\n",
+		fmt.Printf("%-15s,%-15d,%s,%-7d,%7.2f,%7d,,%6.1f,%5s,%6s,%7s,%8.2f,%9s,%d,=\"%d-%d\",%-15s\n",
 			plname, v.InningsPlayed, numberFormat(v.NotOut), v.RunsScored, v.Average, v.Highest, v.OversBowled,
 			numberFormat(v.RunsConceded), numberFormat(v.Maiden), numberFormat(v.Wickets), v.RunsPerOver,
-			numberFormat(v.Dismissal), v.DroppedCatches, plname)
+			numberFormat(v.Dismissal), v.DroppedCatches, v.BestWickets, v.BestWicketsRuns, plname)
 	}
 }
 
@@ -43,7 +43,7 @@ func getDetails() {
 	rs := db.GetDetails()
 	fmt.Println("Name,date,Runs,howout,dismissal,catchdropped,overs,maiden,runsconceded,wickets")
 
-	//Key has the form playername/date
+	//Key has the form playername/dateG
 	var keys []string
 	for k := range rs {
 		keys = append(keys, k)
