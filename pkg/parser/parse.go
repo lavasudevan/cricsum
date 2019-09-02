@@ -2,6 +2,7 @@ package parser
 
 import (
 	"bufio"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -43,6 +44,10 @@ type Game struct {
 func procBowling(line string) Bowling {
 	var bg Bowling
 	tokens := strings.Split(line, ",")
+	if len(tokens[0]) == 0 {
+		return bg
+	}
+
 	bg.Name = tokens[0]
 	ob, err := strconv.ParseFloat(tokens[1], 64)
 	if err == nil {
@@ -66,6 +71,9 @@ func procBowling(line string) Bowling {
 func procBatting(line string) Batting {
 	var bg Batting
 	tokens := strings.Split(line, ",")
+	if len(tokens[0]) == 0 {
+		return bg
+	}
 	bg.Name = tokens[0]
 	bg.HowOut = tokens[1]
 	bg.FielerName = tokens[2]
@@ -207,9 +215,13 @@ func ReadLine(filename string) Game {
 			continue
 		}
 
-		idx += 1
 		if batBowlCount == 1 || batBowlCount == 3 {
 			bat := procBatting(line)
+			if len(bat.Name) == 0 {
+				fmt.Printf(" *** ignoring batting line # %d [%s]\n", linecounter, line)
+				continue
+			}
+			idx += 1
 			if batBowlCount == 1 {
 				inn1.Bat[idx] = bat
 			}
@@ -219,6 +231,11 @@ func ReadLine(filename string) Game {
 		}
 		if batBowlCount == 2 || batBowlCount == 4 {
 			ball := procBowling(line)
+			if len(ball.Name) == 0 {
+				fmt.Printf(" *** ignoring bowling line # %d [%s]\n", linecounter, line)
+				continue
+			}
+			idx += 1
 			if batBowlCount == 2 {
 				inn1.Bowl[idx] = ball
 			}
