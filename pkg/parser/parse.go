@@ -48,7 +48,7 @@ func procBowling(line string) Bowling {
 		return bg
 	}
 
-	bg.Name = tokens[0]
+	bg.Name = strings.Trim(tokens[0], " ")
 	ob, err := strconv.ParseFloat(tokens[1], 64)
 	if err == nil {
 		bg.OversBowled = float32(ob)
@@ -74,10 +74,10 @@ func procBatting(line string) Batting {
 	if len(tokens[0]) == 0 {
 		return bg
 	}
-	bg.Name = tokens[0]
-	bg.HowOut = tokens[1]
-	bg.FielerName = tokens[2]
-	bg.BowlerName = tokens[3]
+	bg.Name = strings.Trim(tokens[0], " ")
+	bg.HowOut = strings.Trim(tokens[1], " ")
+	bg.FielerName = strings.Trim(tokens[2], " ")
+	bg.BowlerName = strings.Trim(tokens[3], " ")
 	runs, err := strconv.Atoi(tokens[4])
 	//fmt.Printf("err %s\n", err)
 	if err == nil {
@@ -132,7 +132,7 @@ func getDroppedPlayerName(droppedline string) string {
 		#catchdropped,satishn,,,
 	*/
 	tokens := strings.Split(droppedline, ",")
-	return tokens[1]
+	return strings.Trim(tokens[1], " ")
 }
 
 //
@@ -207,6 +207,11 @@ func ReadLine(filename string) Game {
 		}
 		if strings.HasPrefix(line, "#catchdropped") == true {
 			plname := getDroppedPlayerName(line)
+			if len(plname) == 0 {
+				fmt.Printf(" *** ignoring dropped line # %d [%s]\n", linecounter, line)
+				continue
+			}
+
 			if batBowlCount > 2 {
 				inn2.DroppedCatches = append(inn2.DroppedCatches, plname)
 			} else {
