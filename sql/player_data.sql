@@ -79,4 +79,7 @@ insert into player (name,team) values ("nitingupta","phantom");
 insert into player (name,team) values ("phani","tesla");
 insert into player (name,team) values ("kotesh","tesla");
 insert into player (name,team) values ("karthikmurali","phantom");
+insert into player (name,team) values ("dileep","phantom");
+insert into player (name,team) values ("krishna","phantom");
+insert into player (name,team) values ("aryan","phantom");
 
