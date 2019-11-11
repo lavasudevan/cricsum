@@ -79,7 +79,7 @@ func procBatting(line string) Batting {
 	bg.FielerName = strings.Trim(tokens[2], " ")
 	bg.BowlerName = strings.Trim(tokens[3], " ")
 	runs, err := strconv.Atoi(tokens[4])
-	//fmt.Printf("err %s\n", err)
+	//fmt.Fprintf(w,"err %s\n", err)
 	if err == nil {
 		bg.RunsScored = runs
 	}
@@ -185,6 +185,7 @@ func ReadLine(filename string) Game {
 			continue
 		}
 		if strings.HasPrefix(line, "#blg") == true {
+			idx = 0
 			batBowlCount += 1
 			continue
 		}
@@ -255,4 +256,144 @@ func ReadLine(filename string) Game {
 	game.GameDate = tokens[0]
 	log.Printf("readline %s ", time.Since(start))
 	return game
+}
+
+func (g Game) GenHtml(date string) {
+	fo, err := os.Create(date + ".html")
+	if err != nil {
+		panic(err)
+	}
+	defer fo.Close()
+	w := bufio.NewWriter(fo)
+	fmt.Fprintf(w, "<html>\n")
+	fmt.Fprintf(w, "<body>")
+	fmt.Fprintf(w, "<b>Date </b>%s&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>Won by </b> %s ", g.GameDate, g.WonBy)
+
+	i1bat, i1bwl, i1dc := inningsTable(g.Team1)
+	i2bat, i2bwl, i2dc := inningsTable(g.Team2)
+	team1Name := "Team1"
+	team2Name := "Team2"
+
+	fmt.Fprintf(w, "<table>")
+
+	//header
+	fmt.Fprintf(w, "<tr>\n")
+
+	fmt.Fprintf(w, "<th bgcolor=\"#d9d9d9\">\n")
+	fmt.Fprintf(w, "Innings of %s\n", team1Name)
+	fmt.Fprintf(w, "</th>\n")
+
+	fmt.Fprintf(w, "<th bgcolor=\"#d9d9d9\">\n")
+	fmt.Fprintf(w, "Innings of %s\n", team2Name)
+	fmt.Fprintf(w, "</th>\n")
+
+	fmt.Fprintf(w, "</tr>\n")
+
+	//batting
+	fmt.Fprintf(w, "<tr>\n")
+
+	fmt.Fprintf(w, "<td>\n")
+	fmt.Fprintf(w, "%s\n", i1bat)
+	fmt.Fprintf(w, "</td>\n")
+
+	fmt.Fprintf(w, "<td>\n")
+	fmt.Fprintf(w, "%s\n", i2bat)
+	fmt.Fprintf(w, "</td>\n")
+
+	fmt.Fprintf(w, "</tr>\n")
+
+	//bowling
+	fmt.Fprintf(w, "<tr>\n")
+
+	fmt.Fprintf(w, "<td>\n")
+	fmt.Fprintf(w, "%s\n", i1bwl)
+	fmt.Fprintf(w, "</td>\n")
+	fmt.Fprintf(w, "<td>\n")
+	fmt.Fprintf(w, "%s\n", i2bwl)
+	fmt.Fprintf(w, "</td>\n")
+
+	fmt.Fprintf(w, "</tr>\n")
+
+	//dropped catches
+	fmt.Fprintf(w, "<tr>\n")
+
+	fmt.Fprintf(w, "<td>\n")
+	fmt.Fprintf(w, "%s\n", i1dc)
+	fmt.Fprintf(w, "</td>\n")
+	fmt.Fprintf(w, "<td>\n")
+	fmt.Fprintf(w, "%s\n", i2dc)
+	fmt.Fprintf(w, "</td>\n")
+
+	fmt.Fprintf(w, "</tr>\n")
+
+	fmt.Fprintf(w, "</table>")
+
+	fmt.Fprintf(w, "</body>\n")
+	fmt.Fprintf(w, "</html>\n")
+	w.Flush()
+}
+func inningsTable(inn Innings) (string, string, string) {
+	var battbl, bltbl, dctbl string
+	const bgcolor = "bgcolor=\"#d9d9d9\""
+	battbl += fmt.Sprintf("<table>")
+
+	battbl += fmt.Sprintf("<tr>\n")
+	battbl += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "Total")
+	battbl += fmt.Sprintf("<th %s colspan=\"2\" >%s %3.2f</th>\n", bgcolor, "Ov", inn.OversPlayed)
+	battbl += fmt.Sprintf("<th %s colspan=\"2\" >%d %s</th>\n", bgcolor, inn.Total, "Runs")
+	battbl += fmt.Sprintf("</tr>\n")
+	battbl += fmt.Sprintf("<tr>\n")
+	battbl += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "Batsman")
+	battbl += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "how out")
+	battbl += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "fielder")
+	battbl += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "bowler")
+	battbl += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "runs")
+	battbl += fmt.Sprintf("</tr>\n")
+
+	for i := 1; i <= len(inn.Bat); i++ {
+		bt := inn.Bat[i]
+		battbl += fmt.Sprintf("<tr>\n")
+		battbl += fmt.Sprintf("<td>%s</td>\n", bt.Name)
+		battbl += fmt.Sprintf("<td>%s</td>\n", bt.HowOut)
+		battbl += fmt.Sprintf("<td>%s</td>\n", bt.FielerName)
+		battbl += fmt.Sprintf("<td>%s</td>\n", bt.BowlerName)
+		battbl += fmt.Sprintf("<td>%d</td>\n", bt.RunsScored)
+		battbl += fmt.Sprintf("</tr>\n")
+	}
+	battbl += fmt.Sprintf("</table>")
+	//	bltbl += fmt.Sprintf("<br>")
+
+	bltbl += fmt.Sprintf("<table>")
+	bltbl += fmt.Sprintf("<tr>\n")
+	bltbl += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "Bowler")
+	bltbl += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "O")
+	bltbl += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "M")
+	bltbl += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "R")
+	bltbl += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "W")
+	bltbl += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "Econ")
+	bltbl += fmt.Sprintf("</tr>\n")
+
+	for i := 1; i <= len(inn.Bowl); i++ {
+		bl := inn.Bowl[i]
+		bltbl += fmt.Sprintf("<tr>\n")
+		bltbl += fmt.Sprintf("<td>%s</td>\n", bl.Name)
+		bltbl += fmt.Sprintf("<td>%3.f</td>\n", bl.OversBowled)
+		bltbl += fmt.Sprintf("<td>%d</td>\n", bl.Maiden)
+		bltbl += fmt.Sprintf("<td>%d</td>\n", bl.RunsConceded)
+		bltbl += fmt.Sprintf("<td>%d</td>\n", bl.Wickets)
+		econ := float32(bl.RunsConceded) / bl.OversBowled
+		bltbl += fmt.Sprintf("<td>%3.1f</td>\n", econ)
+		bltbl += fmt.Sprintf("</tr>\n")
+	}
+	bltbl += fmt.Sprintf("</table>")
+	//dctbl += fmt.Sprintf("<br>")
+
+	dctbl += fmt.Sprintf("<b>Dropped Catches </b>\n ")
+	dctbl += fmt.Sprintf("<br>")
+	for _, dc := range inn.DroppedCatches {
+		dctbl += fmt.Sprintf("%s\n", dc)
+		dctbl += fmt.Sprintf("<br>")
+	}
+	dctbl += fmt.Sprintf("<br>")
+	return battbl, bltbl, dctbl
 }
