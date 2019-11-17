@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"os"
@@ -12,6 +13,12 @@ import (
 	"github.com/cricsum/pkg/parser"
 )
 
+func getTeamName(plnamewt string) (string, string) {
+	tokens := strings.Split(plnamewt, "/")
+	//plname := tokens[0]
+	//tname := tokens[1]
+	return tokens[0], tokens[1]
+}
 func getSummary(teamname string) {
 	rs := db.GetSummary()
 	fmt.Printf("%-15s,%-15s,%-6s,%-7s,%-7s,%7s,,%6s,%5s,%6s,%7s,%8s,%9s,%s,%s,%-15s\n",
@@ -26,9 +33,7 @@ func getSummary(teamname string) {
 
 	for _, name := range keys {
 		v := rs[name]
-		tokens := strings.Split(name, "/")
-		plname := tokens[0]
-		tname := tokens[1]
+		plname, tname := getTeamName(name)
 		if tname != teamname {
 			continue
 		}
@@ -37,7 +42,7 @@ func getSummary(teamname string) {
 			numberFormat(v.RunsConceded), numberFormat(v.Maiden), numberFormat(v.Wickets), v.RunsPerOver,
 			numberFormat(v.Dismissal), v.DroppedCatches, v.BestWickets, v.BestWicketsRuns, plname)
 	}
-}
+
 
 func getDetails() {
 	rs := db.GetDetails()
@@ -84,6 +89,8 @@ func main() {
 	flag.Parse()
 	if command == "summary" {
 		getSummary("phantom")
+	} else if command == "disable" {
+		db.DisablePlayers()
 	} else if command == "remove" {
 		if date == "" {
 			usage()
@@ -99,5 +106,4 @@ func main() {
 	} else {
 		usage()
 	}
-
 }

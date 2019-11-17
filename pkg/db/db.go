@@ -15,6 +15,7 @@ const (
 var dba *sql.DB
 var mPlayerByName map[string]int
 var mPlayerById map[int]string
+var mPlayer map[int]Player
 
 func openDb() {
 	var err error
@@ -57,8 +58,14 @@ func getId(inningsType string) int {
 	}
 }
 
+type Player struct {
+	Name   string
+	Active int
+	Team   string
+}
 type Summary struct {
 	Name            string
+	PlayerId        int
 	InningsPlayed   int
 	NotOut          int
 	RunsScored      int
@@ -94,21 +101,28 @@ func GetPlayer() (map[string]int, map[int]string) {
 	openDb()
 	//	db, err := sql.Open("sqlite3", "./"+DBNAME)//
 	//	checkErr(err)
-	rows, err := dba.Query("SELECT id,name,team FROM player")
+	rows, err := dba.Query("SELECT id,name,team,active FROM player")
 	checkErr(err)
 	var uid int
 	var playername string
 	var teamname string
+	var active int
+
 	nameMap := make(map[string]int)
 	idMap := make(map[int]string)
+	mPlayer = make(map[int]Player)
 	key := ""
 	for rows.Next() {
-		err = rows.Scan(&uid, &playername, &teamname)
+		err = rows.Scan(&uid, &playername, &teamname, &active)
 		checkErr(err)
 		key = playername + "/" + teamname
 		nameMap[key] = uid
 		idMap[uid] = key
-
+		var p Player
+		p.Name = playername
+		p.Team = teamname
+		p.Active = active
+		mPlayer[uid] = p
 		//fmt.Printf("%d %s", uid, playername)
 	}
 
@@ -286,6 +300,44 @@ func insertDroppedCatches(tx *sql.Tx, innid int, teamName string, droppedCatches
 	}
 }
 
+func GetPlayerDetails(pid int) Player {
+	return mPlayer[pid]
+}
+func IsPlayerActive(pid int) bool {
+	p := mPlayer[pid]
+	if p.Active == 1 {
+		return true
+	} else {
+		return false
+	}
+}
+
+const NoOfMatches int = 3
+
+func DisablePlayers() {
+	//1 active, 0 - inactive
+	rs := GetSummary()
+	fmt.Println("disabling...")
+
+	tx, err := dba.Begin()
+	defer tx.Rollback()
+	checkErr(err)
+
+	for name, v := range rs {
+		if v.InningsPlayed > NoOfMatches {
+			continue
+		}
+		p := GetPlayerDetails(v.PlayerId)
+		if p.Active == 1 {
+			fmt.Println(name + "/" + v.Name)
+			stmt := fmt.Sprintf("update player set active = %d where id = %d ", 0, v.PlayerId)
+			_, err = tx.Exec(stmt)
+			checkErr(err)
+		}
+	}
+	tx.Commit()
+}
+
 func GetSummary() map[string]Summary {
 	refreshPlayer()
 	/*
@@ -439,7 +491,7 @@ func GetSummary() map[string]Summary {
 		var minruns int
 		row.Scan(&minruns)
 		sm.BestWicketsRuns = minruns
-		
+
 		idMap[pid] = sm
 	}
 
@@ -459,7 +511,7 @@ func GetSummary() map[string]Summary {
 		if v.OversBowled > 0.0 {
 			v.RunsPerOver = ((float32)(v.RunsConceded) / ((float32)(noofballs))) * (6.0)
 		}
-
+		v.PlayerId = id
 		rv[mPlayerById[id]] = v
 	}
 	return rv
