@@ -22,6 +22,8 @@ add team2_score integer;
 alter table game 
 add team2_overs real;
 
+alter table player 
+add active integer default 1;
 
 create table if not exists 
 innings_index (
