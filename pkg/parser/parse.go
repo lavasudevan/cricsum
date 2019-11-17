@@ -47,13 +47,16 @@ func procBowling(line string) Bowling {
 	if len(tokens[0]) == 0 {
 		return bg
 	}
+	if len(tokens) < 5 {
+		return bg
+	}
 
 	bg.Name = strings.Trim(tokens[0], " ")
 	ob, err := strconv.ParseFloat(tokens[1], 64)
 	if err == nil {
 		bg.OversBowled = float32(ob)
 	}
-	in, err := strconv.Atoi(tokens[3])
+   	in, err := strconv.Atoi(tokens[3])
 	if err == nil {
 		bg.RunsConceded = in
 	}
@@ -72,6 +75,9 @@ func procBatting(line string) Batting {
 	var bg Batting
 	tokens := strings.Split(line, ",")
 	if len(tokens[0]) == 0 {
+		return bg
+	}
+	if len(tokens) < 5 {
 		return bg
 	}
 	bg.Name = strings.Trim(tokens[0], " ")
@@ -171,7 +177,7 @@ func ReadLine(filename string) Game {
 
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "#inn") == true {
-			batBowlCount += 1
+			batBowlCount++
 			idx = 0
 			if batBowlCount == 1 {
 				inn1.TeamName = getTeamName(line)
@@ -186,7 +192,7 @@ func ReadLine(filename string) Game {
 		}
 		if strings.HasPrefix(line, "#blg") == true {
 			idx = 0
-			batBowlCount += 1
+			batBowlCount++
 			continue
 		}
 		if strings.HasPrefix(line, "#wonby") == true {
@@ -227,7 +233,7 @@ func ReadLine(filename string) Game {
 				fmt.Printf(" *** ignoring batting line # %d [%s]\n", linecounter, line)
 				continue
 			}
-			idx += 1
+			idx++
 			if batBowlCount == 1 {
 				inn1.Bat[idx] = bat
 			}
@@ -241,7 +247,7 @@ func ReadLine(filename string) Game {
 				fmt.Printf(" *** ignoring bowling line # %d [%s]\n", linecounter, line)
 				continue
 			}
-			idx += 1
+			idx++
 			if batBowlCount == 2 {
 				inn1.Bowl[idx] = ball
 			}
@@ -377,7 +383,7 @@ func inningsTable(inn Innings) (string, string, string) {
 		bl := inn.Bowl[i]
 		bltbl += fmt.Sprintf("<tr>\n")
 		bltbl += fmt.Sprintf("<td>%s</td>\n", bl.Name)
-		bltbl += fmt.Sprintf("<td>%3.f</td>\n", bl.OversBowled)
+		bltbl += fmt.Sprintf("<td>%g</td>\n", bl.OversBowled)
 		bltbl += fmt.Sprintf("<td>%d</td>\n", bl.Maiden)
 		bltbl += fmt.Sprintf("<td>%d</td>\n", bl.RunsConceded)
 		bltbl += fmt.Sprintf("<td>%d</td>\n", bl.Wickets)
