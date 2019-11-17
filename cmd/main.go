@@ -26,7 +26,7 @@ func getSummary(teamname string) {
 		"Overs", "Runs", "maiden", "wickets", "RPO", "Dismissal", "dropped Catches", "BBM", "player")
 
 	keys := make([]string, 0, len(rs))
-	for k, _ := range rs {
+	for k := range rs {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
@@ -43,6 +43,69 @@ func getSummary(teamname string) {
 			numberFormat(v.Dismissal), v.DroppedCatches, v.BestWickets, v.BestWicketsRuns, plname)
 	}
 
+	//sort by runs scored
+	keys = nil
+	for k := range rs {
+		v := rs[k]
+		if db.IsPlayerActive(v.PlayerId) == false {
+			continue
+		}
+		_, tname := getTeamName(k)
+
+		if tname != teamname {
+			continue
+		}
+		kn := fmt.Sprintf("%04d#%s", v.RunsScored, k)
+		keys = append(keys, kn)
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(keys)))
+	var byruns Stat
+	byruns.Data = keys
+	ht := byruns.dumpHTMLTable()
+	fmt.Println(keys)
+
+	fo, err := os.Create("summary.html")
+	if err != nil {
+		panic(err)
+	}
+	defer fo.Close()
+	w := bufio.NewWriter(fo)
+	fmt.Fprintf(w, "<html>\n")
+	fmt.Fprintf(w, ht)
+	fmt.Fprintf(w, "</html>\n")
+	w.Flush()
+}
+
+//Stat structure
+type Stat struct {
+	Data []string
+}
+
+func (s Stat) dumpHTMLTable() string {
+	var st string
+	const bgcolor = "bgcolor=\"#d9d9d9\""
+	st += fmt.Sprintf("<table>")
+	st += fmt.Sprintf("<tr>\n")
+	st += fmt.Sprintf("<th colspan=2 %s>By runs</th>", bgcolor)
+	st += fmt.Sprintf("</tr>\n")
+	st += fmt.Sprintf("<tr>\n")
+
+	st += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "Name")
+	st += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "Runs")
+	st += fmt.Sprintf("</tr>\n")
+
+	for i := 0; i < len(s.Data); i++ {
+		tokens := strings.Split(s.Data[i], "#")
+		ntokens := strings.Split(tokens[1], "/")
+		st += fmt.Sprintf("<tr>\n")
+		r, _ := strconv.Atoi(tokens[0])
+		st += fmt.Sprintf("<td>%s</td>\n", ntokens[0])
+		st += fmt.Sprintf("<td>%d</td>\n", r)
+		st += fmt.Sprintf("</tr>\n")
+	}
+	st += fmt.Sprintf("</table>")
+	return st
+}
 
 func getDetails() {
 	rs := db.GetDetails()
@@ -70,9 +133,8 @@ func getDetails() {
 func numberFormat(i int) string {
 	if i == 0 {
 		return ""
-	} else {
-		return strconv.Itoa(i)
 	}
+	return strconv.Itoa(i)
 }
 func usage() {
 	fmt.Println("--command=remove --date=yyyymmdd")
