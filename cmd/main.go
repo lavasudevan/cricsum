@@ -13,12 +13,94 @@ import (
 	"github.com/cricsum/pkg/parser"
 )
 
+type statType int
+
+const (
+	byRuns           statType = 0
+	byWickets        statType = 1
+	byDismissal      statType = 2
+	byDroppedCatches statType = 3
+	byBattingAvg     statType = 4
+	byEconRate       statType = 5
+)
+
+func (st statType) string() string {
+	titles := [...]string{
+		"By Runs",
+		"By Wickets",
+		"By Dismissal",
+		"By Dropped catches",
+		"By Batting Avg",
+		"By Economy rate"}
+	return titles[st]
+}
 func getTeamName(plnamewt string) (string, string) {
 	tokens := strings.Split(plnamewt, "/")
 	//plname := tokens[0]
 	//tname := tokens[1]
 	return tokens[0], tokens[1]
 }
+func getTable(rs map[string]db.Summary, teamname string, st statType) string {
+	title := st.string()
+	keys := make([]string, 0, len(rs))
+	var sortorder int
+	//= 1 if no reverse for econ rate. 0 reverse
+	var divBy100 int
+	head := "Runs"
+	if st == byBattingAvg {
+		head = "Avg"
+		divBy100 = 1
+	} else if st == byEconRate {
+		sortorder = 1
+		divBy100 = 1
+		head = "RPO"
+	} else if st == byDroppedCatches {
+		head = "#"
+	} else if st == byDismissal {
+		head = "#"
+	} else if st == byWickets {
+		head = "#"
+	}
+	for k := range rs {
+		v := rs[k]
+		if db.IsPlayerActive(v.PlayerId) == false {
+			continue
+		}
+		_, tname := getTeamName(k)
+
+		if tname != teamname {
+			continue
+		}
+		var kn string
+		if st == byRuns {
+			kn = fmt.Sprintf("%04d#%s", v.RunsScored, k)
+		} else if st == byWickets {
+			kn = fmt.Sprintf("%04d#%s", v.Wickets, k)
+		} else if st == byDismissal {
+			kn = fmt.Sprintf("%04d#%s", v.Dismissal, k)
+		} else if st == byDismissal {
+			kn = fmt.Sprintf("%04d#%s", v.Dismissal, k)
+		} else if st == byDroppedCatches {
+			kn = fmt.Sprintf("%04d#%s", v.DroppedCatches, k)
+		} else if st == byDismissal {
+			kn = fmt.Sprintf("%04d#%s", v.Dismissal, k)
+		} else if st == byBattingAvg {
+			kn = fmt.Sprintf("%06d#%s", int(v.Average*100), k)
+		} else if st == byEconRate {
+			kn = fmt.Sprintf("%06d#%s", int(v.RunsPerOver*100), k)
+		}
+		keys = append(keys, kn)
+	}
+	if sortorder == 0 {
+		sort.Sort(sort.Reverse(sort.StringSlice(keys)))
+	} else {
+		sort.Sort(sort.StringSlice(keys))
+	}
+	var s Stat
+	s.Data = keys
+	return s.dumpHTMLTable(title, head, divBy100)
+}
+
 func getSummary(teamname string) {
 	rs := db.GetSummary()
 	fmt.Printf("%-15s,%-15s,%-6s,%-7s,%-7s,%7s,,%6s,%5s,%6s,%7s,%8s,%9s,%s,%s,%-15s\n",
@@ -43,27 +125,14 @@ func getSummary(teamname string) {
 			numberFormat(v.Dismissal), v.DroppedCatches, v.BestWickets, v.BestWicketsRuns, plname)
 	}
 
-	//sort by runs scored
-	keys = nil
-	for k := range rs {
-		v := rs[k]
-		if db.IsPlayerActive(v.PlayerId) == false {
-			continue
-		}
-		_, tname := getTeamName(k)
-
-		if tname != teamname {
-			continue
-		}
-		kn := fmt.Sprintf("%04d#%s", v.RunsScored, k)
-		keys = append(keys, kn)
-	}
-	sort.Sort(sort.Reverse(sort.StringSlice(keys)))
-	var byruns Stat
-	byruns.Data = keys
-	ht := byruns.dumpHTMLTable()
+	rt := getTable(rs, teamname, byRuns)
 	fmt.Println(keys)
 
+	wt := getTable(rs, teamname, byWickets)
+	dt := getTable(rs, teamname, byDismissal)
+	dct := getTable(rs, teamname, byDroppedCatches)
+	bat := getTable(rs, teamname, byBattingAvg)
+	ect := getTable(rs, teamname, byEconRate)
 	fo, err := os.Create("summary.html")
 	if err != nil {
 		panic(err)
@@ -71,7 +140,31 @@ func getSummary(teamname string) {
 	defer fo.Close()
 	w := bufio.NewWriter(fo)
 	fmt.Fprintf(w, "<html>\n")
-	fmt.Fprintf(w, ht)
+	fmt.Fprintf(w, "<table>")
+
+	fmt.Fprintf(w, "<td>\n")
+	fmt.Fprintf(w, rt)
+	fmt.Fprintf(w, "</td>\n")
+
+	fmt.Fprintf(w, "<td>\n")
+	fmt.Fprintf(w, bat)
+	fmt.Fprintf(w, "</td>\n")
+
+	fmt.Fprintf(w, "<td>\n")
+	fmt.Fprintf(w, wt)
+	fmt.Fprintf(w, "</td>\n")
+
+	fmt.Fprintf(w, "<td>\n")
+	fmt.Fprintf(w, ect)
+	fmt.Fprintf(w, "</td>\n")
+
+	fmt.Fprintf(w, "<td>\n")
+	fmt.Fprintf(w, dt)
+	fmt.Fprintf(w, "</td>\n")
+
+	fmt.Fprintf(w, "<td>\n")
+	fmt.Fprintf(w, dct)
+	fmt.Fprintf(w, "</td>\n")
 	fmt.Fprintf(w, "</html>\n")
 	w.Flush()
 }
@@ -81,26 +174,29 @@ type Stat struct {
 	Data []string
 }
 
-func (s Stat) dumpHTMLTable() string {
+func (s Stat) dumpHTMLTable(title string, rowHeading string, divBy100 int) string {
 	var st string
 	const bgcolor = "bgcolor=\"#d9d9d9\""
 	st += fmt.Sprintf("<table>")
 	st += fmt.Sprintf("<tr>\n")
-	st += fmt.Sprintf("<th colspan=2 %s>By runs</th>", bgcolor)
+	st += fmt.Sprintf("<th colspan=2 %s>%s</th>", bgcolor, title)
 	st += fmt.Sprintf("</tr>\n")
 	st += fmt.Sprintf("<tr>\n")
 
 	st += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "Name")
-	st += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "Runs")
+	st += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, rowHeading)
 	st += fmt.Sprintf("</tr>\n")
 
 	for i := 0; i < len(s.Data); i++ {
 		tokens := strings.Split(s.Data[i], "#")
 		ntokens := strings.Split(tokens[1], "/")
 		st += fmt.Sprintf("<tr>\n")
-		r, _ := strconv.Atoi(tokens[0])
+		r, _ := strconv.ParseFloat(tokens[0], 64)
+		if divBy100 == 1 {
+			r = r / 100.0
+		}
 		st += fmt.Sprintf("<td>%s</td>\n", ntokens[0])
-		st += fmt.Sprintf("<td>%d</td>\n", r)
+		st += fmt.Sprintf("<td>%g</td>\n", r)
 		st += fmt.Sprintf("</tr>\n")
 	}
 	st += fmt.Sprintf("</table>")
