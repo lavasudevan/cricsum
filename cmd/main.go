@@ -22,6 +22,8 @@ const (
 	byDroppedCatches statType = 3
 	byBattingAvg     statType = 4
 	byEconRate       statType = 5
+	byNotout         statType = 6
+	byNumberInnings  statType = 7
 )
 
 func (st statType) string() string {
@@ -31,7 +33,10 @@ func (st statType) string() string {
 		"By Dismissal",
 		"By Dropped catches",
 		"By Batting Avg",
-		"By Economy rate"}
+		"By Economy rate",
+		"By Not out",
+		"By # of innings",
+	}
 	return titles[st]
 }
 func getTeamName(plnamewt string) (string, string) {
@@ -60,6 +65,10 @@ func getTable(rs map[string]db.Summary, teamname string, st statType) string {
 		head = "#"
 	} else if st == byWickets {
 		head = "#"
+	} else if st == byNumberInnings {
+		head = "#"
+	} else if st == byNotout {
+		head = "#"
 	}
 	for k := range rs {
 		v := rs[k]
@@ -78,12 +87,12 @@ func getTable(rs map[string]db.Summary, teamname string, st statType) string {
 			kn = fmt.Sprintf("%04d#%s", v.Wickets, k)
 		} else if st == byDismissal {
 			kn = fmt.Sprintf("%04d#%s", v.Dismissal, k)
-		} else if st == byDismissal {
-			kn = fmt.Sprintf("%04d#%s", v.Dismissal, k)
+		} else if st == byNotout {
+			kn = fmt.Sprintf("%04d#%s", v.NotOut, k)
 		} else if st == byDroppedCatches {
 			kn = fmt.Sprintf("%04d#%s", v.DroppedCatches, k)
-		} else if st == byDismissal {
-			kn = fmt.Sprintf("%04d#%s", v.Dismissal, k)
+		} else if st == byNumberInnings {
+			kn = fmt.Sprintf("%04d#%s", v.InningsPlayed, k)
 		} else if st == byBattingAvg {
 			kn = fmt.Sprintf("%06d#%s", int(v.Average*100), k)
 		} else if st == byEconRate {
@@ -133,6 +142,8 @@ func getSummary(teamname string) {
 	dct := getTable(rs, teamname, byDroppedCatches)
 	bat := getTable(rs, teamname, byBattingAvg)
 	ect := getTable(rs, teamname, byEconRate)
+	not := getTable(rs, teamname, byNotout)
+	nit := getTable(rs, teamname, byNumberInnings)
 	fo, err := os.Create("summary.html")
 	if err != nil {
 		panic(err)
@@ -165,6 +176,15 @@ func getSummary(teamname string) {
 	fmt.Fprintf(w, "<td>\n")
 	fmt.Fprintf(w, dct)
 	fmt.Fprintf(w, "</td>\n")
+
+	fmt.Fprintf(w, "<td>\n")
+	fmt.Fprintf(w, not)
+	fmt.Fprintf(w, "</td>\n")
+
+	fmt.Fprintf(w, "<td>\n")
+	fmt.Fprintf(w, nit)
+	fmt.Fprintf(w, "</td>\n")
+
 	fmt.Fprintf(w, "</html>\n")
 	w.Flush()
 }
