@@ -36,6 +36,8 @@ type Game struct {
 	GameDate   string
 	Innings1Id int
 	Innings2Id int
+	Team1Name  string
+	Team2Name  string
 	Team1      Innings
 	Team2      Innings
 	WonBy      string
@@ -56,7 +58,7 @@ func procBowling(line string) Bowling {
 	if err == nil {
 		bg.OversBowled = float32(ob)
 	}
-   	in, err := strconv.Atoi(tokens[3])
+	in, err := strconv.Atoi(tokens[3])
 	if err == nil {
 		bg.RunsConceded = in
 	}
@@ -198,6 +200,13 @@ func ReadLine(filename string) Game {
 		if strings.HasPrefix(line, "#wonby") == true {
 			tokens := strings.Split(line, ",")
 			game.WonBy = tokens[1]
+			if len(tokens) == 4 {
+				game.Team1Name = tokens[2]
+				game.Team2Name = tokens[3]
+			} else {
+				game.Team1Name = "team1"
+				game.Team2Name = "team2"
+			}
 			continue
 		}
 

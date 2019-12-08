@@ -21,6 +21,10 @@ alter table game
 add team2_score integer;
 alter table game 
 add team2_overs real;
+alter table game
+add team1_name text;
+alter table game,
+add team2_name text;
 
 alter table player 
 add active integer default 1;

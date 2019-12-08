@@ -147,10 +147,11 @@ func updateIndex(itype string, id int) {
 }
 func insertGame(tx *sql.Tx, gamedate string, inn1id int, inn2id int, wonby string,
 	inn1total int, inn1overs float32,
-	inn2total int, inn2overs float32) {
-	stmt := fmt.Sprintf("insert into game (date, innings1_id, innings2_id,wonby,team1_score,team1_overs,team2_score,team2_overs) "+
-		"values ('%s',%d,%d,'%s',%d,%f,%d,%f) ",
-		gamedate, inn1id, inn2id, wonby, inn1total, inn1overs, inn2total, inn2overs)
+	inn2total int, inn2overs float32,
+	team1name string, team2name string) {
+	stmt := fmt.Sprintf("insert into game (date, innings1_id, innings2_id,wonby,team1_score,team1_overs,team2_score,team2_overs,team1_name,team2_name) "+
+		"values ('%s',%d,%d,'%s',%d,%f,%d,%f,'%s','%s') ",
+		gamedate, inn1id, inn2id, wonby, inn1total, inn1overs, inn2total, inn2overs, team1name, team2name)
 	_, err := tx.Exec(stmt)
 	fmt.Println(stmt)
 	checkErr(err)
@@ -776,7 +777,8 @@ func UpdateGame(game parser.Game) int {
 	insertDroppedCatches(tx, inn2id, game.Team1.TeamName, game.Team2.DroppedCatches)
 	insertGame(tx, game.GameDate, inn1id, inn2id, game.WonBy,
 		game.Team1.Total, game.Team1.OversPlayed,
-		game.Team2.Total, game.Team2.OversPlayed)
+		game.Team2.Total, game.Team2.OversPlayed,
+		game.Team1Name, game.Team2Name)
 
 	tx.Commit()
 
