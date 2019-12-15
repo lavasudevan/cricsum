@@ -8,33 +8,22 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-const (
-	DBNAME = "scores.db"
-)
+//SDB wrapper for sql.DB
+type SDB struct {
+	*sql.DB
+}
 
-var dba *sql.DB
 var mPlayerByName map[string]int
-var mPlayerById map[int]string
+var mPlayerByID map[int]string
 var mPlayer map[int]Player
 
-func openDb() {
-	var err error
-	if dba == nil {
-		dba, err = sql.Open("sqlite3", "./"+DBNAME)
-		checkErr(err)
-	}
-}
-func closeDB() {
-	dba.Close()
-}
-
-func refreshPlayer() {
+func (dba *SDB) refreshPlayer() {
 	if len(mPlayerByName) == 0 {
-		mPlayerByName, mPlayerById = GetPlayer()
+		mPlayerByName, mPlayerByID = dba.GetPlayer()
 	}
 }
-func getId(inningsType string) int {
-	openDb()
+func (dba *SDB) getID(inningsType string) int {
+	//openDb()
 
 	//	stmt := "select id FROM innings_index where type like '$1'"
 	var stmt string
@@ -58,14 +47,17 @@ func getId(inningsType string) int {
 	}
 }
 
+//Player data structure
 type Player struct {
 	Name   string
 	Active int
 	Team   string
 }
+
+//Summary with stats
 type Summary struct {
 	Name            string
-	PlayerId        int
+	PlayerID        int
 	InningsPlayed   int
 	NotOut          int
 	RunsScored      int
@@ -82,9 +74,10 @@ type Summary struct {
 	BestWicketsRuns int
 }
 
+//Details about each game
 type Details struct {
 	Name           string
-	Id             int
+	ID             int
 	Date           string
 	RunsScored     int
 	Dismissal      int
@@ -96,9 +89,9 @@ type Details struct {
 	Wickets        int
 }
 
-//
-func GetPlayer() (map[string]int, map[int]string) {
-	openDb()
+//GetPlayer retrieves all the players, creates 2 map. one with id and another with name
+func (dba *SDB) GetPlayer() (map[string]int, map[int]string) {
+	//openDb()
 	//	db, err := sql.Open("sqlite3", "./"+DBNAME)//
 	//	checkErr(err)
 	rows, err := dba.Query("SELECT id,name,team,active FROM player")
@@ -138,7 +131,7 @@ func checkErr(err error) {
 	}
 }
 
-func updateIndex(itype string, id int) {
+func (dba *SDB) updateIndex(itype string, id int) {
 	//select id FROM innings_index where type like '$1'"
 	stmt := fmt.Sprintf("update innings_index set id = %d where type like '%s'", id, itype)
 	_, err := dba.Exec(stmt)
@@ -156,9 +149,9 @@ func insertGame(tx *sql.Tx, gamedate string, inn1id int, inn2id int, wonby strin
 	fmt.Println(stmt)
 	checkErr(err)
 }
-func checkGameExist(gameDate string) int {
+func (dba *SDB) checkGameExist(gameDate string) int {
 	stmt := fmt.Sprintf("select count(*) from game where date like '%s'", gameDate)
-	openDb()
+	//openDb()
 	fmt.Println(stmt)
 	row := dba.QueryRow(stmt)
 	var cnt int
@@ -301,23 +294,26 @@ func insertDroppedCatches(tx *sql.Tx, innid int, teamName string, droppedCatches
 	}
 }
 
+//GetPlayerDetails returns player details with a player id
 func GetPlayerDetails(pid int) Player {
 	return mPlayer[pid]
 }
+
+//IsPlayerActive returns if the player is active or inactive
 func IsPlayerActive(pid int) bool {
 	p := mPlayer[pid]
 	if p.Active == 1 {
 		return true
-	} else {
-		return false
 	}
+	return false
 }
 
-const NoOfMatches int = 3
+const noOfMatches int = 3
 
-func DisablePlayers() {
+//DisablePlayers disable all inactive players
+func (dba *SDB) DisablePlayers() {
 	//1 active, 0 - inactive
-	rs := GetSummary()
+	rs := dba.GetSummary()
 	fmt.Println("disabling...")
 
 	tx, err := dba.Begin()
@@ -325,13 +321,13 @@ func DisablePlayers() {
 	checkErr(err)
 
 	for name, v := range rs {
-		if v.InningsPlayed > NoOfMatches {
+		if v.InningsPlayed > noOfMatches {
 			continue
 		}
-		p := GetPlayerDetails(v.PlayerId)
+		p := GetPlayerDetails(v.PlayerID)
 		if p.Active == 1 {
 			fmt.Println(name + "/" + v.Name)
-			stmt := fmt.Sprintf("update player set active = %d where id = %d ", 0, v.PlayerId)
+			stmt := fmt.Sprintf("update player set active = %d where id = %d ", 0, v.PlayerID)
 			_, err = tx.Exec(stmt)
 			checkErr(err)
 		}
@@ -339,8 +335,9 @@ func DisablePlayers() {
 	tx.Commit()
 }
 
-func GetSummary() map[string]Summary {
-	refreshPlayer()
+//GetSummary returns stats for all the games
+func (dba *SDB) GetSummary() map[string]Summary {
+	dba.refreshPlayer()
 	/*
 			type Summary struct {
 			Name          string
@@ -367,7 +364,7 @@ func GetSummary() map[string]Summary {
 		select fielder_id, count(fielder_id) from innings where fielder_id > 0 group by fielder_id;
 	*/
 
-	openDb()
+	//openDb()
 
 	rows, err := dba.Query("select player_id,count(*) from innings where how_out not in ('dnb') group by player_id")
 	checkErr(err)
@@ -512,17 +509,19 @@ func GetSummary() map[string]Summary {
 		if v.OversBowled > 0.0 {
 			v.RunsPerOver = ((float32)(v.RunsConceded) / ((float32)(noofballs))) * (6.0)
 		}
-		v.PlayerId = id
-		rv[mPlayerById[id]] = v
+		v.PlayerID = id
+		rv[mPlayerByID[id]] = v
 	}
 	return rv
 }
 func makeKey(playername string, date string) string {
 	return fmt.Sprintf("%s/%s", playername, date)
 }
-func GetDetails() map[string]Details {
-	openDb()
-	refreshPlayer()
+
+//GetDetails returs details of each of the game
+func (dba *SDB) GetDetails() map[string]Details {
+	//openDb()
+	dba.refreshPlayer()
 	var inn1id, inn2id int
 	var date string
 	rows, err := dba.Query("select date,innings1_id,innings2_id from game ")
@@ -535,43 +534,43 @@ func GetDetails() map[string]Details {
 		dateMap[inn2id] = date
 	}
 
-	var id, pid, runs_scored int
-	var how_out string
+	var id, pid, runsScored int
+	var howOut string
 	rows, err = dba.Query("select id,player_id,runs_scored,how_out from innings ")
 	checkErr(err)
 	detmap := make(map[string]Details)
 	var ky string
 	for rows.Next() {
-		err = rows.Scan(&id, &pid, &runs_scored, &how_out)
+		err = rows.Scan(&id, &pid, &runsScored, &howOut)
 		checkErr(err)
 		var det Details
-		ky = makeKey(mPlayerById[pid], dateMap[id])
-		det.Id = id
-		det.RunsScored = runs_scored
-		det.HowOut = how_out
-		det.Id = pid
+		ky = makeKey(mPlayerByID[pid], dateMap[id])
+		det.ID = id
+		det.RunsScored = runsScored
+		det.HowOut = howOut
+		det.ID = pid
 		det.Date = dateMap[id]
-		det.Name = mPlayerById[pid]
+		det.Name = mPlayerByID[pid]
 		detmap[ky] = det
 	}
 
-	var overs_bowled float32
+	var overBowled float32
 	var maiden, runs, wickets int
 	rows, err = dba.Query("select id,player_id,overs_bowled,maiden,runs,wickets from bowl_innings")
 	checkErr(err)
 	for rows.Next() {
-		err = rows.Scan(&id, &pid, &overs_bowled, &maiden, &runs, &wickets)
+		err = rows.Scan(&id, &pid, &overBowled, &maiden, &runs, &wickets)
 		checkErr(err)
 		var det Details
-		ky = makeKey(mPlayerById[pid], dateMap[id])
+		ky = makeKey(mPlayerByID[pid], dateMap[id])
 		det = detmap[ky]
-		det.OversBowled = overs_bowled
+		det.OversBowled = overBowled
 		det.RunsConceded = runs
 		det.Maiden = maiden
 		det.Wickets = wickets
 
 		if len(det.Name) == 0 {
-			det.Name = mPlayerById[pid]
+			det.Name = mPlayerByID[pid]
 			det.Date = dateMap[id]
 			det.HowOut = "dnb"
 		}
@@ -585,12 +584,12 @@ func GetDetails() map[string]Details {
 		err = rows.Scan(&id, &pid, &cntDismisal)
 		checkErr(err)
 		var det Details
-		ky = makeKey(mPlayerById[pid], dateMap[id])
+		ky = makeKey(mPlayerByID[pid], dateMap[id])
 		det = detmap[ky]
 		//accumulating becase we may have common fielder some times when playing within phantoms
 		det.Dismissal += cntDismisal
 		if len(det.Name) == 0 {
-			det.Name = mPlayerById[pid]
+			det.Name = mPlayerByID[pid]
 			det.Date = dateMap[id]
 			det.HowOut = "dnb"
 		}
@@ -604,12 +603,12 @@ func GetDetails() map[string]Details {
 		err = rows.Scan(&id, &pid, &cntCatchDropped)
 		checkErr(err)
 		var det Details
-		ky = makeKey(mPlayerById[pid], dateMap[id])
+		ky = makeKey(mPlayerByID[pid], dateMap[id])
 		det = detmap[ky]
 		//accumulating becase we may have common fielder some times when playing within phantoms
 		det.DroppedCatches += cntCatchDropped
 		if len(det.Name) == 0 {
-			det.Name = mPlayerById[pid]
+			det.Name = mPlayerByID[pid]
 			det.Date = dateMap[id]
 			det.HowOut = "dnb"
 		}
@@ -619,7 +618,7 @@ func GetDetails() map[string]Details {
 	return detmap
 }
 
-func getInningsId(gameDate string) (int, int, int) {
+func (dba *SDB) getInningsID(gameDate string) (int, int, int) {
 	var stmt string
 	stmt = fmt.Sprintf("select id,innings1_id,innings2_id FROM game where date like '%s'", gameDate)
 
@@ -637,14 +636,14 @@ func getInningsId(gameDate string) (int, int, int) {
 	}
 }
 
-//
-func RemoveGame(gameDate string) int {
-	if checkGameExist(gameDate) <= 0 {
+//RemoveGame removes game from DB
+func (dba *SDB) RemoveGame(gameDate string) int {
+	if dba.checkGameExist(gameDate) <= 0 {
 		fmt.Println("*** game doesnt exist")
 		return 0
 	}
 	tx, err := dba.Begin()
-	gameid, inn1id, inn2id := getInningsId(gameDate)
+	gameid, inn1id, inn2id := dba.getInningsID(gameDate)
 	stmt := fmt.Sprintf("delete from dropped_catches where innings_id in (%d,%d)",
 		inn1id, inn2id)
 	fmt.Println(stmt)
@@ -674,15 +673,15 @@ func RemoveGame(gameDate string) int {
 	return 0
 }
 
-//
-func UpdateGame(game parser.Game) int {
-	openDb()
+//UpdateGame inserts game data in the DB
+func (dba *SDB) UpdateGame(game parser.Game) int {
+	//openDb()
 
-	if checkGameExist(game.GameDate) != 0 {
+	if dba.checkGameExist(game.GameDate) != 0 {
 		fmt.Println("*** game already exist")
 		return 0
 	}
-	refreshPlayer()
+	dba.refreshPlayer()
 	mp := verifyPlayerExist(game.Team1, game.Team2.TeamName)
 	er := 0
 	if len(mp) > 0 {
@@ -765,7 +764,7 @@ func UpdateGame(game parser.Game) int {
 	defer tx.Rollback()
 	checkErr(err)
 
-	inn1id := getId("bat") + 1
+	inn1id := dba.getID("bat") + 1
 	//fmt.Printf(" bat id %d\n", innid)
 	inn2id := inn1id + 1
 	//bowlInnId := getId("bowl") + 1

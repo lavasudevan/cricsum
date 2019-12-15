@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"database/sql"
 	"flag"
 	"fmt"
 	"os"
@@ -12,6 +13,27 @@ import (
 	"github.com/cricsum/pkg/db"
 	"github.com/cricsum/pkg/parser"
 )
+
+const (
+	dbname = "scores.db"
+)
+
+var mdb *db.SDB
+
+func openDb() {
+	var err error
+	var dba *sql.DB
+	if mdb == nil {
+		dba, err = sql.Open("sqlite3", "./"+dbname)
+		mdb = &db.SDB{dba}
+	}
+	checkErr(err)
+}
+func checkErr(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
 
 type statType int
 
@@ -72,7 +94,7 @@ func getTable(rs map[string]db.Summary, teamname string, st statType) string {
 	}
 	for k := range rs {
 		v := rs[k]
-		if db.IsPlayerActive(v.PlayerId) == false {
+		if db.IsPlayerActive(v.PlayerID) == false {
 			continue
 		}
 		_, tname := getTeamName(k)
@@ -111,7 +133,7 @@ func getTable(rs map[string]db.Summary, teamname string, st statType) string {
 }
 
 func getSummary(teamname string) {
-	rs := db.GetSummary()
+	rs := mdb.GetSummary()
 	fmt.Printf("%-15s,%-15s,%-6s,%-7s,%-7s,%7s,,%6s,%5s,%6s,%7s,%8s,%9s,%s,%s,%-15s\n",
 		"player", "innings_played", "notout", "runs", "average", "highest",
 		"Overs", "Runs", "maiden", "wickets", "RPO", "Dismissal", "dropped Catches", "BBM", "player")
@@ -224,7 +246,7 @@ func (s Stat) dumpHTMLTable(title string, rowHeading string, divBy100 int) strin
 }
 
 func getDetails() {
-	rs := db.GetDetails()
+	rs := mdb.GetDetails()
 	fmt.Println("Name,date,Runs,howout,dismissal,catchdropped,overs,maiden,runsconceded,wickets")
 
 	//Key has the form playername/dateG
@@ -265,21 +287,23 @@ func main() {
 	flag.StringVar(&file, "scorefile", "", "a string")
 	flag.StringVar(&date, "date", "", "date string in yyyymmdd format")
 	flag.Parse()
+	openDb()
+
 	if command == "summary" {
 		getSummary("phantom")
 	} else if command == "disable" {
-		db.DisablePlayers()
+		mdb.DisablePlayers()
 	} else if command == "remove" {
 		if date == "" {
 			usage()
 		}
-		db.RemoveGame(date)
+		mdb.RemoveGame(date)
 	} else if command == "details" {
 		getDetails()
 	} else if command == "upload" {
 		gm := parser.ReadLine(file)
 		fmt.Printf("date of file %s\n", gm.GameDate)
-		db.UpdateGame(gm)
+		mdb.UpdateGame(gm)
 		gm.GenHtml(gm.GameDate)
 	} else {
 		usage()
