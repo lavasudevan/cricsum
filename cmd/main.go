@@ -304,7 +304,7 @@ func main() {
 		gm := parser.ReadLine(file)
 		fmt.Printf("date of file %s\n", gm.GameDate)
 		mdb.UpdateGame(gm)
-		gm.GenHtml(gm.GameDate)
+		gm.GenHTML(gm.GameDate)
 	} else {
 		usage()
 	}

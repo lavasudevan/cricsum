@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+//Batting data structure
 type Batting struct {
 	Name       string
 	RunsScored int
@@ -17,6 +18,8 @@ type Batting struct {
 	FielerName string
 	BowlerName string
 }
+
+//Bowling data structure
 type Bowling struct {
 	Name         string
 	OversBowled  float32
@@ -24,6 +27,8 @@ type Bowling struct {
 	Maiden       int
 	Wickets      int
 }
+
+//Innings data structure
 type Innings struct {
 	TeamName       string //name of the team batting
 	Bat            map[int]Batting
@@ -32,6 +37,8 @@ type Innings struct {
 	OversPlayed    float32
 	DroppedCatches []string
 }
+
+//Game data structure
 type Game struct {
 	GameDate   string
 	Innings1Id int
@@ -143,7 +150,7 @@ func getDroppedPlayerName(droppedline string) string {
 	return strings.Trim(tokens[1], " ")
 }
 
-//
+//ReadLine parses the score file in csv format and returns a game object
 func ReadLine(filename string) Game {
 	start := time.Now()
 	log.Println("loading from ", filename)
@@ -207,6 +214,7 @@ func ReadLine(filename string) Game {
 				game.Team1Name = "team1"
 				game.Team2Name = "team2"
 			}
+			fmt.Printf("%s Vs %s wonby %s", game.Team1Name, game.Team2Name, game.WonBy)
 			continue
 		}
 
@@ -273,7 +281,8 @@ func ReadLine(filename string) Game {
 	return game
 }
 
-func (g Game) GenHtml(date string) {
+//GenHTML generate scorecard in html format
+func (g Game) GenHTML(date string) {
 	fo, err := os.Create(date + ".html")
 	if err != nil {
 		panic(err)
