@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/cricsum/pkg/parser"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 //SDB wrapper for sql.DB
@@ -366,7 +365,7 @@ func (dba *SDB) GetSummary() map[string]Summary {
 
 	//openDb()
 
-	rows, err := dba.Query("select player_id,count(*) from innings where how_out not in ('dnb') group by player_id")
+	rows, err := dba.Query("select player_id,count() as cnt from innings where how_out not like 'dnb' group by player_id")
 	checkErr(err)
 	var pid, cnt int
 	idMap := make(map[int]Summary)

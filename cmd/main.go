@@ -12,6 +12,7 @@ import (
 
 	"github.com/cricsum/pkg/db"
 	"github.com/cricsum/pkg/parser"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 const (
@@ -25,9 +26,10 @@ func openDb() {
 	var dba *sql.DB
 	if mdb == nil {
 		dba, err = sql.Open("sqlite3", "./"+dbname)
-		mdb = &db.SDB{dba}
+		checkErr(err)
+		mdb = new(db.SDB)
+		mdb.DB = dba
 	}
-	checkErr(err)
 }
 func checkErr(err error) {
 	if err != nil {
