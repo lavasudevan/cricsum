@@ -88,3 +88,5 @@ insert into player (name,team,active) values ("chiru","tesla",1);
 insert into player (name,team,active) values ("mohan","tesla",1);
 insert into player (name,team,active) values ("abhin","phantom",1);
 insert into player (name,team,active) values ("anup","phantom",1);
+insert into player (name,team,active) values ("pradeep","phantom",1);
+insert into player (name,team,active) values ("babu","tesla",1);
