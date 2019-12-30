@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
-	"regexp"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -38,7 +37,7 @@ func compare(t *testing.T, want interface{}, got interface{}) {
 	}
 }
 func getMockdB(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
-	dbm, mock, err := sqlmock.New()
+	dbm, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
@@ -54,17 +53,10 @@ func setupPlayer(mock sqlmock.Sqlmock) {
 			AddRow(2, "player2", "pht", 1))
 }
 func TestGetPlayer(t *testing.T) {
-	// dbm, mock, err := sqlmock.New()
-
-	// if err != nil {
-	// 	t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
-	// }
 	dbm, mock := getMockdB(t)
 	defer dbm.Close()
 
-	//cols := []string{"pid", "name", "team", "active_col4"}
-	//var cols [4]string
-	cols := []string{"", "", "team", "active_col4"}
+	cols := []string{"pid", "name", "team", "active_col4"}
 
 	byid := map[int]string{
 		1: "player1/pht",
@@ -89,21 +81,12 @@ func TestGetPlayer(t *testing.T) {
 func TestGetSummary(t *testing.T) {
 	dbm, mock := getMockdB(t)
 	defer dbm.Close()
-	sdb := &SDB{dbm}
+	sdb := new(SDB)
+	sdb.DB = dbm
 	cols := []string{"player_id", "cnt"}
 
-	actual := "select player_id,count() as cnt from innings where how_out not like 'dnb' group by player_id"
-	expect := "select player_id,count() as cnt from innings where how_out not like 'dnb' group by player_id"
-	re, err := regexp.Compile(expect)
-	if err != nil {
-		fmt.Printf("**** err %s \n", err)
-	}
-	if !re.MatchString(actual) {
-		fmt.Printf(`**** could not match actual sql: "%s" with expected regexp "%s"`, actual, re.String())
-	}
-
 	setupPlayer(mock)
-	mock.ExpectQuery("select player_id,count(1) as cnt from innings where how_out not in ('dnb') group by player_id").
+	mock.ExpectQuery("select player_id,count() as cnt from innings where how_out not in ('dnb') group by player_id").
 		WithArgs().
 		WillReturnRows(mock.NewRows(cols).
 			AddRow(1, 5).
@@ -150,7 +133,6 @@ func TestGetSummary(t *testing.T) {
 		WillReturnRows(mock.NewRows(cols).
 			AddRow(1, 4).
 			AddRow(2, 3))
-	//
 	mock.ExpectQuery("select player_id, count(*) from dropped_catches group by player_id").
 		WithArgs().
 		WillReturnRows(mock.NewRows(cols).
@@ -170,7 +152,6 @@ func TestGetSummary(t *testing.T) {
 		WillReturnRows(mock.NewRows([]string{"min"}).
 			AddRow(8))
 	rs := sdb.GetSummary()
-	v := rs[""]
+	v := rs["player2/pht"]
 	compare(t, v.InningsPlayed, 1)
-
 }

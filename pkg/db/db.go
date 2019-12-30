@@ -365,7 +365,7 @@ func (dba *SDB) GetSummary() map[string]Summary {
 
 	//openDb()
 
-	rows, err := dba.Query("select player_id,count() as cnt from innings where how_out not like 'dnb' group by player_id")
+	rows, err := dba.Query("select player_id,count() as cnt from innings where how_out not in ('dnb') group by player_id")
 	checkErr(err)
 	var pid, cnt int
 	idMap := make(map[int]Summary)
@@ -454,7 +454,7 @@ func (dba *SDB) GetSummary() map[string]Summary {
 		idMap[pid] = sm
 	}
 
-	rows, err = dba.Query("select fielder_id, count(fielder_id) from innings where fielder_id > 0 group by fielder_id;")
+	rows, err = dba.Query("select fielder_id, count(fielder_id) from innings where fielder_id > 0 group by fielder_id")
 	checkErr(err)
 	var cntfeilder int
 	for rows.Next() {
@@ -465,7 +465,7 @@ func (dba *SDB) GetSummary() map[string]Summary {
 		idMap[pid] = sm
 	}
 
-	rows, err = dba.Query("select player_id, count(*) from dropped_catches group by player_id ;")
+	rows, err = dba.Query("select player_id, count(*) from dropped_catches group by player_id")
 	checkErr(err)
 	for rows.Next() {
 		err = rows.Scan(&pid, &cntfeilder)
@@ -596,7 +596,7 @@ func (dba *SDB) GetDetails() map[string]Details {
 	}
 
 	var cntCatchDropped int
-	rows, err = dba.Query("select innings_id,player_id, count(player_id) from dropped_catches group by innings_id,player_id;")
+	rows, err = dba.Query("select innings_id,player_id, count(player_id) from dropped_catches group by innings_id,player_id")
 	checkErr(err)
 	for rows.Next() {
 		err = rows.Scan(&id, &pid, &cntCatchDropped)
