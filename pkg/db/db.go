@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/cricsum/pkg/parser"
 )
@@ -310,9 +311,9 @@ func IsPlayerActive(pid int) bool {
 const noOfMatches int = 3
 
 //DisablePlayers disable all inactive players
-func (dba *SDB) DisablePlayers() {
+func (dba *SDB) DisablePlayers(year string) {
 	//1 active, 0 - inactive
-	rs := dba.GetSummary()
+	rs := dba.GetSummary(year)
 	fmt.Println("disabling...")
 
 	tx, err := dba.Begin()
@@ -334,8 +335,21 @@ func (dba *SDB) DisablePlayers() {
 	tx.Commit()
 }
 
+func embedIDS(qry, year string) string {
+	id1 := "select innings1_id from game where date like '%YEAR%'"
+	id2 := "select innings2_id from game where date like '%YEAR%'"
+	id1 = strings.Replace(id1, "%YEAR%", year+"%", 1)
+	id2 = strings.Replace(id2, "%YEAR%", year+"%", 1)
+	ids := "(" + id1 + " union " + id2 + ")"
+
+	fmt.Println(ids)
+	qry = strings.Replace(qry, "%IDS%", ids, 1)
+	fmt.Println(qry)
+	return qry
+}
+
 //GetSummary returns stats for all the games
-func (dba *SDB) GetSummary() map[string]Summary {
+func (dba *SDB) GetSummary(year string) map[string]Summary {
 	dba.refreshPlayer()
 	/*
 			type Summary struct {
@@ -365,7 +379,8 @@ func (dba *SDB) GetSummary() map[string]Summary {
 
 	//openDb()
 
-	rows, err := dba.Query("select player_id,count() as cnt from innings where how_out not in ('dnb') group by player_id")
+	qry := "select player_id,count() as cnt from innings where id in %IDS% and how_out not in ('dnb') group by player_id"
+	rows, err := dba.Query(embedIDS(qry, year))
 	checkErr(err)
 	var pid, cnt int
 	idMap := make(map[int]Summary)
@@ -378,7 +393,8 @@ func (dba *SDB) GetSummary() map[string]Summary {
 		idMap[pid] = sm
 	}
 
-	rows, err = dba.Query("select player_id,sum(runs_scored) from innings where how_out not in ('dnb') group by player_id")
+	qry = "select player_id,sum(runs_scored) from innings where id in %IDS% and how_out not in ('dnb') group by player_id"
+	rows, err = dba.Query(embedIDS(qry, year))
 	checkErr(err)
 	var sumruns int
 	for rows.Next() {
@@ -389,7 +405,8 @@ func (dba *SDB) GetSummary() map[string]Summary {
 		idMap[pid] = sm
 	}
 
-	rows, err = dba.Query("select player_id,count(*) from innings where how_out like 'no' group by player_id")
+	qry = "select player_id,count(*) from innings where id in %IDS% and how_out like 'no' group by player_id"
+	rows, err = dba.Query(embedIDS(qry, year))
 	checkErr(err)
 	var cntno int
 	for rows.Next() {
@@ -400,7 +417,8 @@ func (dba *SDB) GetSummary() map[string]Summary {
 		idMap[pid] = sm
 	}
 
-	rows, err = dba.Query("select player_id,max(runs_scored) from innings group by player_id")
+	qry = "select player_id,max(runs_scored) from innings where id in %IDS% group by player_id"
+	rows, err = dba.Query(embedIDS(qry, year))
 	checkErr(err)
 	var maxruns int
 	for rows.Next() {
@@ -411,7 +429,8 @@ func (dba *SDB) GetSummary() map[string]Summary {
 		idMap[pid] = sm
 	}
 
-	rows, err = dba.Query("select player_id, sum(overs_bowled) from bowl_innings group by player_id")
+	qry = "select player_id, sum(overs_bowled) from bowl_innings where id in %IDS% group by player_id"
+	rows, err = dba.Query(embedIDS(qry, year))
 	checkErr(err)
 	var sumovers float32
 	for rows.Next() {
@@ -422,7 +441,8 @@ func (dba *SDB) GetSummary() map[string]Summary {
 		idMap[pid] = sm
 	}
 
-	rows, err = dba.Query("select player_id, sum(maiden) from bowl_innings group by player_id")
+	qry = "select player_id, sum(maiden) from bowl_innings where id in %IDS% group by player_id"
+	rows, err = dba.Query(embedIDS(qry, year))
 	checkErr(err)
 	var summaiden int
 	for rows.Next() {
@@ -433,7 +453,8 @@ func (dba *SDB) GetSummary() map[string]Summary {
 		idMap[pid] = sm
 	}
 
-	rows, err = dba.Query("select player_id, sum(runs) from bowl_innings group by player_id")
+	qry = "select player_id, sum(runs) from bowl_innings where id in %IDS% group by player_id"
+	rows, err = dba.Query(embedIDS(qry, year))
 	checkErr(err)
 	for rows.Next() {
 		err = rows.Scan(&pid, &sumruns)
@@ -443,7 +464,8 @@ func (dba *SDB) GetSummary() map[string]Summary {
 		idMap[pid] = sm
 	}
 
-	rows, err = dba.Query("select player_id, sum(wickets) from bowl_innings group by player_id")
+	qry = "select player_id, sum(wickets) from bowl_innings where id in %IDS% group by player_id"
+	rows, err = dba.Query(embedIDS(qry, year))
 	checkErr(err)
 	var sumwickets int
 	for rows.Next() {
@@ -454,7 +476,8 @@ func (dba *SDB) GetSummary() map[string]Summary {
 		idMap[pid] = sm
 	}
 
-	rows, err = dba.Query("select fielder_id, count(fielder_id) from innings where fielder_id > 0 group by fielder_id")
+	qry = "select fielder_id, count(fielder_id) from innings where fielder_id > 0 and id in %IDS% group by fielder_id"
+	rows, err = dba.Query(embedIDS(qry, year))
 	checkErr(err)
 	var cntfeilder int
 	for rows.Next() {
@@ -465,7 +488,8 @@ func (dba *SDB) GetSummary() map[string]Summary {
 		idMap[pid] = sm
 	}
 
-	rows, err = dba.Query("select player_id, count(*) from dropped_catches group by player_id")
+	qry = "select player_id, count(*) from dropped_catches where innings_id in %IDS% group by player_id"
+	rows, err = dba.Query(embedIDS(qry, year))
 	checkErr(err)
 	for rows.Next() {
 		err = rows.Scan(&pid, &cntfeilder)
@@ -475,16 +499,17 @@ func (dba *SDB) GetSummary() map[string]Summary {
 		idMap[pid] = sm
 	}
 
-	rows, err = dba.Query("select player_id, max(wickets) from bowl_innings group by player_id order by max(wickets) desc")
+	qry = "select player_id, max(wickets) from bowl_innings where id in %IDS% group by player_id order by max(wickets) desc"
+	rows, err = dba.Query(embedIDS(qry, year))
 	var maxwickets int
 	for rows.Next() {
 		err = rows.Scan(&pid, &maxwickets)
 		checkErr(err)
 		sm := idMap[pid]
 		sm.BestWickets = maxwickets
-
-		stmt := fmt.Sprintf("select min(runs) from bowl_innings where player_id = %d and wickets = %d", pid, maxwickets)
-		row := dba.QueryRow(stmt)
+		s1 := fmt.Sprintf("and player_id = %d and wickets = %d", pid, maxwickets)
+		stmt := "select min(runs) from bowl_innings where id in %IDS% " + s1
+		row := dba.QueryRow(embedIDS(stmt, year))
 		var minruns int
 		row.Scan(&minruns)
 		sm.BestWicketsRuns = minruns
