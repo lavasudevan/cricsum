@@ -41,14 +41,17 @@ func checkErr(err error) {
 type statType int
 
 const (
-	byRuns           statType = 0
-	byWickets        statType = 1
-	byDismissal      statType = 2
-	byDroppedCatches statType = 3
-	byBattingAvg     statType = 4
-	byEconRate       statType = 5
-	byNotout         statType = 6
-	byNumberInnings  statType = 7
+	byRuns               statType = 0
+	byWickets            statType = 1
+	byDismissal          statType = 2
+	byDroppedCatches     statType = 3
+	byBattingAvg         statType = 4
+	byEconRate           statType = 5
+	byNotout             statType = 6
+	byNumberInnings      statType = 7
+	byNumberofBallsFaced statType = 8
+	byStrikeRate         statType = 9
+	byBoundariesHit      statType = 10
 )
 
 func (st statType) string() string {
@@ -61,6 +64,9 @@ func (st statType) string() string {
 		"By Economy rate",
 		"By Not out",
 		"By # of innings",
+		"By # of balls faced",
+		"By Strike Rate",
+		"By # of Boundaries hit",
 	}
 	return titles[st]
 }
@@ -94,6 +100,13 @@ func getTable(rs map[string]db.Summary, teamname string, st statType) string {
 		head = "#"
 	} else if st == byNotout {
 		head = "#"
+	} else if st == byNumberofBallsFaced {
+		head = "#"
+	} else if st == byStrikeRate {
+		head = "per"
+		//divBy100 = 1
+	} else if st == byBoundariesHit {
+		head = "#"
 	}
 	for k := range rs {
 		v := rs[k]
@@ -122,6 +135,13 @@ func getTable(rs map[string]db.Summary, teamname string, st statType) string {
 			kn = fmt.Sprintf("%06d#%s", int(v.Average*100), k)
 		} else if st == byEconRate {
 			kn = fmt.Sprintf("%06d#%s", int(v.RunsPerOver*100), k)
+		} else if st == byNumberofBallsFaced {
+			kn = fmt.Sprintf("%04d#%s", v.BallsFaced, k)
+		} else if st == byStrikeRate {
+			sr := float32(v.RunsScored) / float32(v.BallsFaced) * 100.0
+			kn = fmt.Sprintf("%04d#%s", int(sr), k)
+		} else if st == byBoundariesHit {
+			kn = fmt.Sprintf("%04d#%s", v.FoursHit+v.SixesHit, k)
 		}
 		keys = append(keys, kn)
 	}
@@ -164,11 +184,14 @@ func getSummary(teamname, year string) {
 
 	wt := getTable(rs, teamname, byWickets)
 	dt := getTable(rs, teamname, byDismissal)
-	dct := getTable(rs, teamname, byDroppedCatches)
+	// dct := getTable(rs, teamname, byDroppedCatches)
 	bat := getTable(rs, teamname, byBattingAvg)
 	ect := getTable(rs, teamname, byEconRate)
 	not := getTable(rs, teamname, byNotout)
 	nit := getTable(rs, teamname, byNumberInnings)
+	bf := getTable(rs, teamname, byNumberofBallsFaced)
+	bb := getTable(rs, teamname, byBoundariesHit)
+	bs := getTable(rs, teamname, byStrikeRate)
 	fo, err := os.Create("summary.html")
 	if err != nil {
 		panic(err)
@@ -198,9 +221,9 @@ func getSummary(teamname, year string) {
 	fmt.Fprintf(w, dt)
 	fmt.Fprintf(w, "</td>\n")
 
-	fmt.Fprintf(w, "<td>\n")
-	fmt.Fprintf(w, dct)
-	fmt.Fprintf(w, "</td>\n")
+	// fmt.Fprintf(w, "<td>\n")
+	// fmt.Fprintf(w, dct)
+	// fmt.Fprintf(w, "</td>\n")
 
 	fmt.Fprintf(w, "<td>\n")
 	fmt.Fprintf(w, not)
@@ -208,6 +231,18 @@ func getSummary(teamname, year string) {
 
 	fmt.Fprintf(w, "<td>\n")
 	fmt.Fprintf(w, nit)
+	fmt.Fprintf(w, "</td>\n")
+
+	fmt.Fprintf(w, "<td>\n")
+	fmt.Fprintf(w, bf)
+	fmt.Fprintf(w, "</td>\n")
+
+	fmt.Fprintf(w, "<td>\n")
+	fmt.Fprintf(w, bb)
+	fmt.Fprintf(w, "</td>\n")
+
+	fmt.Fprintf(w, "<td>\n")
+	fmt.Fprintf(w, bs)
 	fmt.Fprintf(w, "</td>\n")
 
 	fmt.Fprintf(w, "</html>\n")
