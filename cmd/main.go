@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cricsum/pkg/db"
 	"github.com/cricsum/pkg/parser"
@@ -134,8 +135,8 @@ func getTable(rs map[string]db.Summary, teamname string, st statType) string {
 	return s.dumpHTMLTable(title, head, divBy100)
 }
 
-func getSummary(teamname string) {
-	rs := mdb.GetSummary()
+func getSummary(teamname, year string) {
+	rs := mdb.GetSummary(year)
 	fmt.Printf("%-15s,%-15s,%-6s,%-7s,%-7s,%7s,,%6s,%5s,%6s,%7s,%8s,%9s,%s,%s,%-15s\n",
 		"player", "innings_played", "notout", "runs", "average", "highest",
 		"Overs", "Runs", "maiden", "wickets", "RPO", "Dismissal", "dropped Catches", "BBM", "player")
@@ -279,22 +280,30 @@ func numberFormat(i int) string {
 func usage() {
 	fmt.Println("--command=remove --date=yyyymmdd")
 	fmt.Println("--command=upload --scorefile=yyyymmdd.csv")
-	fmt.Println("--command=summary")
+	fmt.Println("--command=summary [--year=yyyy]")
 	fmt.Println("--command=details")
 	os.Exit(1)
 }
 func main() {
-	var command, file, date string
+	var command, file, date, year string
 	flag.StringVar(&command, "command", "", "a string")
 	flag.StringVar(&file, "scorefile", "", "a string")
+	flag.StringVar(&year, "year", "", "yyyy for the year. if empty year is assumed for the current year")
 	flag.StringVar(&date, "date", "", "date string in yyyymmdd format")
 	flag.Parse()
 	openDb()
+	if command == "summary" {
+		if len(year) > 4 {
+			usage()
+		} else if len(year) == 0 {
+			year = strconv.Itoa(time.Now().Year())
+		}
+	}
 
 	if command == "summary" {
-		getSummary("phantom")
+		getSummary("phantom", year)
 	} else if command == "disable" {
-		mdb.DisablePlayers()
+		mdb.DisablePlayers(strconv.Itoa(time.Now().Year()))
 	} else if command == "remove" {
 		if date == "" {
 			usage()
