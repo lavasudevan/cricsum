@@ -312,10 +312,12 @@ func main() {
 	} else if command == "details" {
 		getDetails()
 	} else if command == "upload" {
-		gm := parser.ReadLine(file)
+		gm, ec := parser.ReadLine(file)
 		fmt.Printf("date of file %s\n", gm.GameDate)
-		mdb.UpdateGame(gm)
-		gm.GenHTML(gm.GameDate)
+		if ec == 0 {
+			mdb.UpdateGame(gm)
+			gm.GenHTML(gm.GameDate)
+		}
 	} else {
 		usage()
 	}

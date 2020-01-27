@@ -21,8 +21,8 @@ func compare(t *testing.T, ts testcase) {
 
 func TestReadLine(t *testing.T) {
 
-	gm := ReadLine("20110101.csv")
-	gm1 := ReadLine("20110102.csv")
+	gm, _ := ReadLine("20110101.csv")
+	gm1, _ := ReadLine("20110102.csv")
 
 	cases := []testcase{
 		{"team name1", "phantom", gm.Team1Name},

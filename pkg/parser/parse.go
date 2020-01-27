@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	mystruct "github.com/cricsum/pkg/struct"
 )
 
 //Batting data structure
@@ -17,6 +19,9 @@ type Batting struct {
 	HowOut     string
 	FielerName string
 	BowlerName string
+	BallsFaced int
+	FoursHit   int
+	SixesHit   int
 }
 
 //Bowling data structure
@@ -80,14 +85,21 @@ func procBowling(line string) Bowling {
 	return bg
 
 }
-func procBatting(line string) Batting {
+func procBatting(line, version string, linecounter int) (Batting, int) {
 	var bg Batting
 	tokens := strings.Split(line, ",")
+	vf, _ := strconv.ParseFloat(version, 64)
 	if len(tokens[0]) == 0 {
-		return bg
+		fmt.Printf("batting line [%d] is empty\n", linecounter)
+		return bg, 1
 	}
-	if len(tokens) < 5 {
-		return bg
+	if len(tokens) < 5 && vf < 2 {
+		fmt.Printf("batting line [%d] should have batsman name, howout, fielder, bowler name, runs scored\n", linecounter)
+		return bg, 1
+	}
+	if len(tokens) < 8 && vf >= 2 {
+		fmt.Printf("batting line [%d] should have batsman name, howout, fielder, bowler name, runs scored, balls faced, # of 4s, # of 6s\n", linecounter)
+		return bg, 1
 	}
 	bg.Name = strings.Trim(tokens[0], " ")
 	bg.HowOut = strings.Trim(tokens[1], " ")
@@ -98,7 +110,15 @@ func procBatting(line string) Batting {
 	if err == nil {
 		bg.RunsScored = runs
 	}
-	return bg
+	if vf >= 2 {
+		bg.BallsFaced, _ = strconv.Atoi(tokens[5])
+		bg.FoursHit, _ = strconv.Atoi(tokens[6])
+		bg.SixesHit, _ = strconv.Atoi(tokens[7])
+	}
+	if !validInnings(bg, version, linecounter) {
+		return bg, 1
+	}
+	return bg, 0
 }
 func getTeamName(commentLine string) string {
 	/*
@@ -151,7 +171,7 @@ func getDroppedPlayerName(droppedline string) string {
 }
 
 //ReadLine parses the score file in csv format and returns a game object
-func ReadLine(filename string) Game {
+func ReadLine(filename string) (Game, int) {
 	start := time.Now()
 	log.Println("loading from ", filename)
 	inFile, err := os.Open(filename)
@@ -174,6 +194,8 @@ func ReadLine(filename string) Game {
 	inn2.Bowl = make(map[int]Bowling)
 	game := Game{}
 
+	version := "0"
+	ec := 0
 	for scanner.Scan() {
 		line := scanner.Text()
 
@@ -204,6 +226,10 @@ func ReadLine(filename string) Game {
 			batBowlCount++
 			continue
 		}
+		if strings.HasPrefix(line, "#version") == true {
+			tokens := strings.Split(line, ",")
+			version = tokens[1]
+		}
 		if strings.HasPrefix(line, "#wonby") == true {
 			tokens := strings.Split(line, ",")
 			game.WonBy = tokens[1]
@@ -214,7 +240,7 @@ func ReadLine(filename string) Game {
 				game.Team1Name = "team1"
 				game.Team2Name = "team2"
 			}
-			fmt.Printf("%s Vs %s wonby %s", game.Team1Name, game.Team2Name, game.WonBy)
+			fmt.Printf("%s Vs %s wonby %s\n", game.Team1Name, game.Team2Name, game.WonBy)
 			continue
 		}
 
@@ -245,11 +271,15 @@ func ReadLine(filename string) Game {
 		}
 
 		if batBowlCount == 1 || batBowlCount == 3 {
-			bat := procBatting(line)
-			if len(bat.Name) == 0 {
-				fmt.Printf(" *** ignoring batting line # %d [%s]\n", linecounter, line)
+			bat, e := procBatting(line, version, linecounter)
+			ec += e
+			if e > 0 {
 				continue
 			}
+			// if len(bat.Name) == 0 {
+			// 	fmt.Printf(" *** ignoring batting line # %d [%s]\n", linecounter, line)
+			// 	continue
+			// }
 			idx++
 			if batBowlCount == 1 {
 				inn1.Bat[idx] = bat
@@ -278,7 +308,39 @@ func ReadLine(filename string) Game {
 	tokens := strings.Split(filename, ".")
 	game.GameDate = tokens[0]
 	log.Printf("readline %s ", time.Since(start))
-	return game
+	return game, ec
+}
+
+func validInnings(bat Batting, version string, linecounter int) bool {
+	if len(bat.Name) == 0 {
+		fmt.Printf(" *** ignoring batting line # %d. Batsman name can't be empty\n", linecounter)
+		return false
+	}
+	if bat.RunsScored < ((bat.FoursHit * 4) + (bat.SixesHit * 6)) {
+		fmt.Printf(" *** ignoring batting line # %d. Runs scored is less than boundaries scored\n", linecounter)
+		return false
+	}
+	if bat.BallsFaced < (bat.FoursHit + bat.SixesHit) {
+		fmt.Printf(" *** ignoring batting line # %d. Balls faced can't be < boundary balls\n", linecounter)
+		return false
+	}
+	vf, _ := strconv.ParseFloat(version, 64)
+	if vf >= 2 {
+		if bat.RunsScored > 0 && bat.BallsFaced <= 0 {
+			fmt.Printf(" *** ignoring batting line # %d. Runs can't be scored with out facing a ball\n", linecounter)
+			return false
+		}
+	}
+	//var ho mystruct.Howout //= "b" // = string(bat.HowOut)
+	ho := mystruct.Howout(string(bat.HowOut))
+	//ho = bat.HowOut
+	er := ho.Valid()
+	if er != nil {
+		fmt.Printf(" *** ignoring batting line # %d. %s\n", linecounter, er)
+		return false
+	}
+
+	return true
 }
 
 //GenHTML generate scorecard in html format
@@ -363,8 +425,8 @@ func inningsTable(inn Innings) (string, string, string) {
 
 	battbl += fmt.Sprintf("<tr>\n")
 	battbl += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "Total")
-	battbl += fmt.Sprintf("<th %s colspan=\"2\" >%s %3.2f</th>\n", bgcolor, "Ov", inn.OversPlayed)
-	battbl += fmt.Sprintf("<th %s colspan=\"2\" >%d %s</th>\n", bgcolor, inn.Total, "Runs")
+	battbl += fmt.Sprintf("<th %s colspan=\"4\" >%s %3.2f</th>\n", bgcolor, "Ov", inn.OversPlayed)
+	battbl += fmt.Sprintf("<th %s colspan=\"4\" >%d %s</th>\n", bgcolor, inn.Total, "Runs")
 	battbl += fmt.Sprintf("</tr>\n")
 	battbl += fmt.Sprintf("<tr>\n")
 	battbl += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "Batsman")
@@ -372,6 +434,10 @@ func inningsTable(inn Innings) (string, string, string) {
 	battbl += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "fielder")
 	battbl += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "bowler")
 	battbl += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "runs")
+	battbl += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "B")
+	battbl += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "4s")
+	battbl += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "6s")
+	battbl += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "SR")
 	battbl += fmt.Sprintf("</tr>\n")
 
 	for i := 1; i <= len(inn.Bat); i++ {
@@ -382,6 +448,14 @@ func inningsTable(inn Innings) (string, string, string) {
 		battbl += fmt.Sprintf("<td>%s</td>\n", bt.FielerName)
 		battbl += fmt.Sprintf("<td>%s</td>\n", bt.BowlerName)
 		battbl += fmt.Sprintf("<td>%d</td>\n", bt.RunsScored)
+		battbl += fmt.Sprintf("<td>%d</td>\n", bt.BallsFaced)
+		battbl += fmt.Sprintf("<td>%d</td>\n", bt.FoursHit)
+		battbl += fmt.Sprintf("<td>%d</td>\n", bt.SixesHit)
+		sr := float32(bt.RunsScored) / float32(bt.BallsFaced) * 100.0
+		if bt.BallsFaced == 0 {
+			sr = 0
+		}
+		battbl += fmt.Sprintf("<td>%3.1f</td>\n", sr)
 		battbl += fmt.Sprintf("</tr>\n")
 	}
 	battbl += fmt.Sprintf("</table>")

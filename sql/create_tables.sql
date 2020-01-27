@@ -46,6 +46,12 @@ innings (
   primary key(id, player_id)
 );
 
+alter table innings 
+add balls_faced integer;
+alter table innings 
+add fours_count integer;
+alter table innings 
+add sixes_count integer;
 
 create table if not exists 
 bowl_innings (

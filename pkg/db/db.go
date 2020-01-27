@@ -263,8 +263,8 @@ func insertInnings(tx *sql.Tx, innid int, inn parser.Innings, bowlingTeamName st
 		plid := mPlayerByName[v.Name+"/"+inn.TeamName]
 		flid := mPlayerByName[v.FielerName+"/"+bowlingTeamName]
 		blid := mPlayerByName[v.BowlerName+"/"+bowlingTeamName]
-		stmt := fmt.Sprintf("insert into innings (id,player_id, runs_scored,fielder_id, how_out,bowler_id) values (%d,%d,%d,%d,'%s',%d)",
-			innid, plid, v.RunsScored, flid, v.HowOut, blid)
+		stmt := fmt.Sprintf("insert into innings (id,player_id, runs_scored,fielder_id, how_out,bowler_id,balls_faced,fours_count,sixes_count) values (%d,%d,%d,%d,'%s',%d,%d,%d,%d)",
+			innid, plid, v.RunsScored, flid, v.HowOut, blid, v.BallsFaced, v.FoursHit, v.SixesHit)
 		fmt.Println(stmt)
 		_, err := tx.Exec(stmt)
 		checkErr(err)
@@ -342,9 +342,9 @@ func embedIDS(qry, year string) string {
 	id2 = strings.Replace(id2, "%YEAR%", year+"%", 1)
 	ids := "(" + id1 + " union " + id2 + ")"
 
-	fmt.Println(ids)
+	//fmt.Println(ids)
 	qry = strings.Replace(qry, "%IDS%", ids, 1)
-	fmt.Println(qry)
+	//fmt.Println(qry)
 	return qry
 }
 
