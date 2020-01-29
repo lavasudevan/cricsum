@@ -52,6 +52,8 @@ const (
 	byNumberofBallsFaced statType = 8
 	byStrikeRate         statType = 9
 	byBoundariesHit      statType = 10
+	byOversPerWicket     statType = 11
+	byOversBowled        statType = 12
 )
 
 func (st statType) string() string {
@@ -67,6 +69,8 @@ func (st statType) string() string {
 		"By # of balls faced",
 		"By Strike Rate",
 		"By # of Boundaries hit",
+		"Overs per wicket",
+		"Overs bowled",
 	}
 	return titles[st]
 }
@@ -103,12 +107,19 @@ func getTable(rs map[string]db.Summary, teamname string, st statType) string {
 	} else if st == byNumberofBallsFaced {
 		head = "#"
 	} else if st == byStrikeRate {
-		head = "per"
-		//divBy100 = 1
+		head = "%%"
+	} else if st == byOversPerWicket {
+		head = "#"
+		sortorder = 1
+		divBy100 = 1
+	} else if st == byOversBowled {
+		head = "#"
+		divBy100 = 1
 	} else if st == byBoundariesHit {
 		head = "#"
 	}
 	for k := range rs {
+		ignore := 0
 		v := rs[k]
 		if db.IsPlayerActive(v.PlayerID) == false {
 			continue
@@ -123,10 +134,19 @@ func getTable(rs map[string]db.Summary, teamname string, st statType) string {
 			kn = fmt.Sprintf("%04d#%s", v.RunsScored, k)
 		} else if st == byWickets {
 			kn = fmt.Sprintf("%04d#%s", v.Wickets, k)
+			if int(v.OversBowled) == 0 {
+				ignore = 1
+			}
 		} else if st == byDismissal {
 			kn = fmt.Sprintf("%04d#%s", v.Dismissal, k)
+			if int(v.Dismissal) == 0 {
+				ignore = 1
+			}
 		} else if st == byNotout {
 			kn = fmt.Sprintf("%04d#%s", v.NotOut, k)
+			if v.NotOut == 0 {
+				ignore = 1
+			}
 		} else if st == byDroppedCatches {
 			kn = fmt.Sprintf("%04d#%s", v.DroppedCatches, k)
 		} else if st == byNumberInnings {
@@ -135,15 +155,46 @@ func getTable(rs map[string]db.Summary, teamname string, st statType) string {
 			kn = fmt.Sprintf("%06d#%s", int(v.Average*100), k)
 		} else if st == byEconRate {
 			kn = fmt.Sprintf("%06d#%s", int(v.RunsPerOver*100), k)
+			if int(v.OversBowled) == 0 {
+				ignore = 1
+			}
+
 		} else if st == byNumberofBallsFaced {
 			kn = fmt.Sprintf("%04d#%s", v.BallsFaced, k)
 		} else if st == byStrikeRate {
 			sr := float32(v.RunsScored) / float32(v.BallsFaced) * 100.0
+			if v.BallsFaced == 0 {
+				ignore = 1
+			}
 			kn = fmt.Sprintf("%04d#%s", int(sr), k)
+		} else if st == byOversPerWicket {
+			sr := v.OversBowled / float32(v.Wickets) * 100
+			if v.Wickets == 0 {
+				sr = 0
+			}
+			if int(v.OversBowled) == 0 {
+				ignore = 1
+			}
+
+			kn = fmt.Sprintf("%04d#%s", int(sr), k)
+		} else if st == byOversBowled {
+			sr := v.OversBowled * 100
+			kn = fmt.Sprintf("%04d#%s", int(sr), k)
+			if int(sr) == 0 {
+				ignore = 1
+			}
+
 		} else if st == byBoundariesHit {
-			kn = fmt.Sprintf("%04d#%s", v.FoursHit+v.SixesHit, k)
+			bh := v.FoursHit + v.SixesHit
+			kn = fmt.Sprintf("%04d#%s", bh, k)
+			if bh == 0 {
+				ignore = 1
+			}
 		}
-		keys = append(keys, kn)
+
+		if ignore == 0 {
+			keys = append(keys, kn)
+		}
 	}
 	if sortorder == 0 {
 		sort.Sort(sort.Reverse(sort.StringSlice(keys)))
@@ -192,6 +243,9 @@ func getSummary(teamname, year string) {
 	bf := getTable(rs, teamname, byNumberofBallsFaced)
 	bb := getTable(rs, teamname, byBoundariesHit)
 	bs := getTable(rs, teamname, byStrikeRate)
+	bo := getTable(rs, teamname, byOversPerWicket)
+	bob := getTable(rs, teamname, byOversBowled)
+
 	fo, err := os.Create("summary.html")
 	if err != nil {
 		panic(err)
@@ -201,6 +255,8 @@ func getSummary(teamname, year string) {
 	fmt.Fprintf(w, "<html>\n")
 	fmt.Fprintf(w, "<table>")
 
+	fmt.Fprintf(w, "<tr>")
+
 	fmt.Fprintf(w, "<td>\n")
 	fmt.Fprintf(w, rt)
 	fmt.Fprintf(w, "</td>\n")
@@ -209,23 +265,7 @@ func getSummary(teamname, year string) {
 	fmt.Fprintf(w, bat)
 	fmt.Fprintf(w, "</td>\n")
 
-	fmt.Fprintf(w, "<td>\n")
-	fmt.Fprintf(w, wt)
-	fmt.Fprintf(w, "</td>\n")
-
-	fmt.Fprintf(w, "<td>\n")
-	fmt.Fprintf(w, ect)
-	fmt.Fprintf(w, "</td>\n")
-
-	fmt.Fprintf(w, "<td>\n")
-	fmt.Fprintf(w, dt)
-	fmt.Fprintf(w, "</td>\n")
-
-	// fmt.Fprintf(w, "<td>\n")
-	// fmt.Fprintf(w, dct)
-	// fmt.Fprintf(w, "</td>\n")
-
-	fmt.Fprintf(w, "<td>\n")
+	fmt.Fprintf(w, "<td valign=\"top\">\n")
 	fmt.Fprintf(w, not)
 	fmt.Fprintf(w, "</td>\n")
 
@@ -237,13 +277,45 @@ func getSummary(teamname, year string) {
 	fmt.Fprintf(w, bf)
 	fmt.Fprintf(w, "</td>\n")
 
-	fmt.Fprintf(w, "<td>\n")
+	fmt.Fprintf(w, "<td valign=\"top\">\n")
 	fmt.Fprintf(w, bb)
 	fmt.Fprintf(w, "</td>\n")
 
-	fmt.Fprintf(w, "<td>\n")
+	fmt.Fprintf(w, "<td valign=\"top\">\n")
 	fmt.Fprintf(w, bs)
 	fmt.Fprintf(w, "</td>\n")
+
+	fmt.Fprintf(w, "</tr>")
+	fmt.Fprintf(w, "<tr>")
+	fmt.Fprintf(w, "</tr>")
+	fmt.Fprintf(w, "</br>")
+	fmt.Fprintf(w, "<tr>")
+
+	fmt.Fprintf(w, "<td valign=\"top\">\n")
+	fmt.Fprintf(w, wt)
+	fmt.Fprintf(w, "</td>\n")
+
+	fmt.Fprintf(w, "<td valign=\"top\">\n")
+	fmt.Fprintf(w, bo)
+	fmt.Fprintf(w, "</td>\n")
+
+	fmt.Fprintf(w, "<td valign=\"top\">\n")
+	fmt.Fprintf(w, bob)
+	fmt.Fprintf(w, "</td>\n")
+
+	fmt.Fprintf(w, "<td valign=\"top\">\n")
+	fmt.Fprintf(w, ect)
+	fmt.Fprintf(w, "</td>\n")
+
+	fmt.Fprintf(w, "<td valign=\"top\">\n")
+	fmt.Fprintf(w, dt)
+	fmt.Fprintf(w, "</td>\n")
+
+	fmt.Fprintf(w, "</tr>")
+
+	// fmt.Fprintf(w, "<td>\n")
+	// fmt.Fprintf(w, dct)
+	// fmt.Fprintf(w, "</td>\n")
 
 	fmt.Fprintf(w, "</html>\n")
 	w.Flush()
@@ -315,15 +387,16 @@ func numberFormat(i int) string {
 func usage() {
 	fmt.Println("--command=remove --date=yyyymmdd")
 	fmt.Println("--command=upload --scorefile=yyyymmdd.csv")
-	fmt.Println("--command=summary [--year=yyyy]")
+	fmt.Println("--command=summary [--year=yyyy] [--team=phantom/tesla]")
 	fmt.Println("--command=details")
 	os.Exit(1)
 }
 func main() {
-	var command, file, date, year string
+	var command, file, date, year, team string
 	flag.StringVar(&command, "command", "", "a string")
 	flag.StringVar(&file, "scorefile", "", "a string")
 	flag.StringVar(&year, "year", "", "yyyy for the year. if empty year is assumed for the current year")
+	flag.StringVar(&team, "team", "phantom", "")
 	flag.StringVar(&date, "date", "", "date string in yyyymmdd format")
 	flag.Parse()
 	openDb()
@@ -336,7 +409,7 @@ func main() {
 	}
 
 	if command == "summary" {
-		getSummary("phantom", year)
+		getSummary(team, year)
 	} else if command == "disable" {
 		mdb.DisablePlayers(strconv.Itoa(time.Now().Year()))
 	} else if command == "remove" {
