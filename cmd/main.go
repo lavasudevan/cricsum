@@ -54,6 +54,7 @@ const (
 	byBoundariesHit      statType = 10
 	byOversPerWicket     statType = 11
 	byOversBowled        statType = 12
+	byRunsPerWicket      statType = 13
 )
 
 func (st statType) string() string {
@@ -71,6 +72,7 @@ func (st statType) string() string {
 		"By # of Boundaries hit",
 		"Overs per wicket",
 		"Overs bowled",
+		"Runs per wicket",
 	}
 	return titles[st]
 }
@@ -86,8 +88,10 @@ func getTable(rs map[string]db.Summary, teamname string, st statType) string {
 	var sortorder int
 	//= 1 if no reverse for econ rate. 0 reverse
 	var divBy100 int
-	head := "Runs"
-	if st == byBattingAvg {
+	var head string
+	if st == byRuns {
+		head = "Runs,BBI"
+	} else if st == byBattingAvg {
 		head = "Avg"
 		divBy100 = 1
 	} else if st == byEconRate {
@@ -99,7 +103,7 @@ func getTable(rs map[string]db.Summary, teamname string, st statType) string {
 	} else if st == byDismissal {
 		head = "#"
 	} else if st == byWickets {
-		head = "#"
+		head = "#, BBM"
 	} else if st == byNumberInnings {
 		head = "#"
 	} else if st == byNotout {
@@ -109,6 +113,10 @@ func getTable(rs map[string]db.Summary, teamname string, st statType) string {
 	} else if st == byStrikeRate {
 		head = "%%"
 	} else if st == byOversPerWicket {
+		head = "#"
+		sortorder = 1
+		divBy100 = 1
+	} else if st == byRunsPerWicket {
 		head = "#"
 		sortorder = 1
 		divBy100 = 1
@@ -131,9 +139,9 @@ func getTable(rs map[string]db.Summary, teamname string, st statType) string {
 		}
 		var kn string
 		if st == byRuns {
-			kn = fmt.Sprintf("%04d#%s", v.RunsScored, k)
+			kn = fmt.Sprintf("%04d#%s,%d", v.RunsScored, k, v.Highest)
 		} else if st == byWickets {
-			kn = fmt.Sprintf("%04d#%s", v.Wickets, k)
+			kn = fmt.Sprintf("%04d#%s,%d-%d", v.Wickets, k, v.BestWickets, v.BestWicketsRuns)
 			if int(v.OversBowled) == 0 {
 				ignore = 1
 			}
@@ -172,7 +180,7 @@ func getTable(rs map[string]db.Summary, teamname string, st statType) string {
 			if v.Wickets == 0 {
 				sr = 0
 			}
-			if int(v.OversBowled) == 0 {
+			if v.Wickets == 0 {
 				ignore = 1
 			}
 
@@ -183,7 +191,12 @@ func getTable(rs map[string]db.Summary, teamname string, st statType) string {
 			if int(sr) == 0 {
 				ignore = 1
 			}
-
+		} else if st == byRunsPerWicket {
+			sr := v.RunsPerWicket * 100
+			kn = fmt.Sprintf("%04d#%s", int(sr), k)
+			if int(sr) == 0 {
+				ignore = 1
+			}
 		} else if st == byBoundariesHit {
 			bh := v.FoursHit + v.SixesHit
 			kn = fmt.Sprintf("%04d#%s", bh, k)
@@ -244,6 +257,7 @@ func getSummary(teamname, year string) {
 	bb := getTable(rs, teamname, byBoundariesHit)
 	bs := getTable(rs, teamname, byStrikeRate)
 	bo := getTable(rs, teamname, byOversPerWicket)
+	rw := getTable(rs, teamname, byRunsPerWicket)
 	bob := getTable(rs, teamname, byOversBowled)
 
 	fo, err := os.Create("summary.html")
@@ -296,15 +310,19 @@ func getSummary(teamname, year string) {
 	fmt.Fprintf(w, "</td>\n")
 
 	fmt.Fprintf(w, "<td valign=\"top\">\n")
+	fmt.Fprintf(w, ect)
+	fmt.Fprintf(w, "</td>\n")
+
+	fmt.Fprintf(w, "<td valign=\"top\">\n")
 	fmt.Fprintf(w, bo)
 	fmt.Fprintf(w, "</td>\n")
 
 	fmt.Fprintf(w, "<td valign=\"top\">\n")
-	fmt.Fprintf(w, bob)
+	fmt.Fprintf(w, rw)
 	fmt.Fprintf(w, "</td>\n")
 
 	fmt.Fprintf(w, "<td valign=\"top\">\n")
-	fmt.Fprintf(w, ect)
+	fmt.Fprintf(w, bob)
 	fmt.Fprintf(w, "</td>\n")
 
 	fmt.Fprintf(w, "<td valign=\"top\">\n")
@@ -331,17 +349,26 @@ func (s Stat) dumpHTMLTable(title string, rowHeading string, divBy100 int) strin
 	const bgcolor = "bgcolor=\"#d9d9d9\""
 	st += fmt.Sprintf("<table>")
 	st += fmt.Sprintf("<tr>\n")
-	st += fmt.Sprintf("<th colspan=2 %s>%s</th>", bgcolor, title)
+	tokens := strings.Split(rowHeading, ",")
+	st += fmt.Sprintf("<th colspan=%d %s>%s</th>", len(tokens)+1, bgcolor, title)
 	st += fmt.Sprintf("</tr>\n")
 	st += fmt.Sprintf("<tr>\n")
 
 	st += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, "Name")
-	st += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, rowHeading)
+	for _, h := range tokens {
+		st += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, h)
+	}
+	//st += fmt.Sprintf("<th %s>%s</th>\n", bgcolor, rowHeading)
 	st += fmt.Sprintf("</tr>\n")
 
+	/*
+		byRuns, byWickets have highest scores / BBM seperated by ,. like
+		156#raj/phantom,69
+	*/
 	for i := 0; i < len(s.Data); i++ {
 		tokens := strings.Split(s.Data[i], "#")
-		ntokens := strings.Split(tokens[1], "/")
+		dtkns := strings.Split(tokens[1], ",")
+		ntokens := strings.Split(dtkns[0], "/")
 		st += fmt.Sprintf("<tr>\n")
 		r, _ := strconv.ParseFloat(tokens[0], 64)
 		if divBy100 == 1 {
@@ -349,6 +376,9 @@ func (s Stat) dumpHTMLTable(title string, rowHeading string, divBy100 int) strin
 		}
 		st += fmt.Sprintf("<td>%s</td>\n", ntokens[0])
 		st += fmt.Sprintf("<td>%g</td>\n", r)
+		if len(dtkns) > 1 {
+			st += fmt.Sprintf("<td>%s</td>\n", dtkns[1])
+		}
 		st += fmt.Sprintf("</tr>\n")
 	}
 	st += fmt.Sprintf("</table>")

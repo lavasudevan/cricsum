@@ -69,6 +69,7 @@ type Summary struct {
 	RunsConceded    int
 	Maiden          int
 	Wickets         int
+	RunsPerWicket   float32
 	RunsPerOver     float32
 	BestWickets     int
 	BestWicketsRuns int
@@ -568,6 +569,9 @@ func (dba *SDB) GetSummary(year string) map[string]Summary {
 
 		if v.OversBowled > 0.0 {
 			v.RunsPerOver = ((float32)(v.RunsConceded) / ((float32)(noofballs))) * (6.0)
+		}
+		if v.Wickets > 0 {
+			v.RunsPerWicket = (float32)(v.RunsConceded) / (float32)(v.Wickets)
 		}
 		v.PlayerID = id
 		rv[mPlayerByID[id]] = v
