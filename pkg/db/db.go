@@ -72,6 +72,9 @@ type Summary struct {
 	RunsPerOver     float32
 	BestWickets     int
 	BestWicketsRuns int
+	BallsFaced      int
+	FoursHit        int
+	SixesHit        int
 }
 
 //Details about each game
@@ -514,6 +517,39 @@ func (dba *SDB) GetSummary(year string) map[string]Summary {
 		row.Scan(&minruns)
 		sm.BestWicketsRuns = minruns
 
+		idMap[pid] = sm
+	}
+
+	var ii int
+	qry = "select player_id,sum(balls_faced) from innings where id in %IDS% and how_out not in ('dnb') group by player_id"
+	rows, err = dba.Query(embedIDS(qry, year))
+	checkErr(err)
+	for rows.Next() {
+		err = rows.Scan(&pid, &ii)
+		checkErr(err)
+		sm := idMap[pid]
+		sm.BallsFaced = ii
+		idMap[pid] = sm
+	}
+
+	qry = "select player_id,sum(fours_count) from innings where id in %IDS% and how_out not in ('dnb') group by player_id"
+	rows, err = dba.Query(embedIDS(qry, year))
+	checkErr(err)
+	for rows.Next() {
+		err = rows.Scan(&pid, &ii)
+		checkErr(err)
+		sm := idMap[pid]
+		sm.FoursHit = ii
+		idMap[pid] = sm
+	}
+	qry = "select player_id,sum(sixes_count) from innings where id in %IDS% and how_out not in ('dnb') group by player_id"
+	rows, err = dba.Query(embedIDS(qry, year))
+	checkErr(err)
+	for rows.Next() {
+		err = rows.Scan(&pid, &ii)
+		checkErr(err)
+		sm := idMap[pid]
+		sm.SixesHit = ii
 		idMap[pid] = sm
 	}
 

@@ -124,6 +124,18 @@ func TestGetSummary(t *testing.T) {
 		`select min(runs) from bowl_innings where id in
 		(select innings1_id from game where date like '2019%' union select innings2_id from game where date like '2019%') 
 		and player_id = 2 and wickets = 3`,
+
+		`select player_id,sum(balls_faced) from innings where id in
+		(select innings1_id from game where date like '2019%' union select innings2_id from game where date like '2019%')
+		and how_out not in ('dnb') group by player_id`,
+
+		`select player_id,sum(fours_count) from innings where id in
+		(select innings1_id from game where date like '2019%' union select innings2_id from game where date like '2019%')
+		and how_out not in ('dnb') group by player_id`,
+
+		`select player_id,sum(sixes_count) from innings where id in
+		(select innings1_id from game where date like '2019%' union select innings2_id from game where date like '2019%')
+		and how_out not in ('dnb') group by player_id`,
 	}
 
 	setupPlayer(mock)
@@ -192,6 +204,22 @@ func TestGetSummary(t *testing.T) {
 		WithArgs().
 		WillReturnRows(mock.NewRows([]string{"min"}).
 			AddRow(8))
+	mock.ExpectQuery(eq[13]).
+		WithArgs().
+		WillReturnRows(mock.NewRows(cols).
+			AddRow(1, 50).
+			AddRow(2, 5))
+	mock.ExpectQuery(eq[14]).
+		WithArgs().
+		WillReturnRows(mock.NewRows(cols).
+			AddRow(1, 1).
+			AddRow(2, 1))
+	mock.ExpectQuery(eq[15]).
+		WithArgs().
+		WillReturnRows(mock.NewRows(cols).
+			AddRow(1, 0).
+			AddRow(2, 1))
+
 	rs := sdb.GetSummary("2019")
 	v := rs["player2/pht"]
 	compare(t, v.InningsPlayed, 1)
