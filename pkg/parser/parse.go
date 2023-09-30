@@ -12,7 +12,7 @@ import (
 	mystruct "github.com/cricsum/pkg/struct"
 )
 
-//Batting data structure
+// Batting data structure
 type Batting struct {
 	Name       string
 	RunsScored int
@@ -24,7 +24,7 @@ type Batting struct {
 	SixesHit   int
 }
 
-//Bowling data structure
+// Bowling data structure
 type Bowling struct {
 	Name         string
 	OversBowled  float32
@@ -33,7 +33,7 @@ type Bowling struct {
 	Wickets      int
 }
 
-//Innings data structure
+// Innings data structure
 type Innings struct {
 	TeamName       string //name of the team batting
 	Bat            map[int]Batting
@@ -43,7 +43,7 @@ type Innings struct {
 	DroppedCatches []string
 }
 
-//Game data structure
+// Game data structure
 type Game struct {
 	GameDate   string
 	Innings1Id int
@@ -170,7 +170,7 @@ func getDroppedPlayerName(droppedline string) string {
 	return strings.Trim(tokens[1], " ")
 }
 
-//ReadLine parses the score file in csv format and returns a game object
+// ReadLine parses the score file in csv format and returns a game object
 func ReadLine(filename string) (Game, int) {
 	start := time.Now()
 	log.Println("loading from ", filename)
@@ -306,6 +306,7 @@ func ReadLine(filename string) (Game, int) {
 	game.Team1 = inn1
 	game.Team2 = inn2
 	tokens := strings.Split(filename, ".")
+	fmt.Println(filename)
 	game.GameDate = tokens[0]
 	log.Printf("readline %s ", time.Since(start))
 	return game, ec
@@ -343,7 +344,7 @@ func validInnings(bat Batting, version string, linecounter int) bool {
 	return true
 }
 
-//GenHTML generate scorecard in html format
+// GenHTML generate scorecard in html format
 func (g Game) GenHTML(date string) {
 	fo, err := os.Create(date + ".html")
 	if err != nil {
@@ -447,15 +448,15 @@ func inningsTable(inn Innings) (string, string, string) {
 		battbl += fmt.Sprintf("<td>%s</td>\n", bt.HowOut)
 		battbl += fmt.Sprintf("<td>%s</td>\n", bt.FielerName)
 		battbl += fmt.Sprintf("<td>%s</td>\n", bt.BowlerName)
-		battbl += fmt.Sprintf("<td>%d</td>\n", bt.RunsScored)
-		battbl += fmt.Sprintf("<td>%d</td>\n", bt.BallsFaced)
+		battbl += fmt.Sprintf("<td align=right>%d</td>\n", bt.RunsScored)
+		battbl += fmt.Sprintf("<td align=right>%d</td>\n", bt.BallsFaced)
 		battbl += fmt.Sprintf("<td>%d</td>\n", bt.FoursHit)
 		battbl += fmt.Sprintf("<td>%d</td>\n", bt.SixesHit)
 		sr := float32(bt.RunsScored) / float32(bt.BallsFaced) * 100.0
 		if bt.BallsFaced == 0 {
 			sr = 0
 		}
-		battbl += fmt.Sprintf("<td>%3.1f</td>\n", sr)
+		battbl += fmt.Sprintf("<td align=right>%3.1f</td>\n", sr)
 		battbl += fmt.Sprintf("</tr>\n")
 	}
 	battbl += fmt.Sprintf("</table>")
@@ -477,10 +478,10 @@ func inningsTable(inn Innings) (string, string, string) {
 		bltbl += fmt.Sprintf("<td>%s</td>\n", bl.Name)
 		bltbl += fmt.Sprintf("<td>%g</td>\n", bl.OversBowled)
 		bltbl += fmt.Sprintf("<td>%d</td>\n", bl.Maiden)
-		bltbl += fmt.Sprintf("<td>%d</td>\n", bl.RunsConceded)
+		bltbl += fmt.Sprintf("<td align=right>%d</td>\n", bl.RunsConceded)
 		bltbl += fmt.Sprintf("<td>%d</td>\n", bl.Wickets)
 		econ := float32(bl.RunsConceded) / bl.OversBowled
-		bltbl += fmt.Sprintf("<td>%3.1f</td>\n", econ)
+		bltbl += fmt.Sprintf("<td align=right>%3.1f</td>\n", econ)
 		bltbl += fmt.Sprintf("</tr>\n")
 	}
 	bltbl += fmt.Sprintf("</table>")
