@@ -17,7 +17,7 @@ all: gen build test
 # Build will always run lint and vet
 #build: lint vet
 build: 
-	GOOS=darwin GOARCH=amd64 go \
+	GOOS=darwin GOARCH=arm64 go \
 		build -o cricsum \
 		./cmd/main.go
 
@@ -27,7 +27,7 @@ dist:
 	cd cmd
 	# run gox to build platform dependent binaries
 	gox \
-	  -os="linux darwin windows"  -arch="amd64 386" -verbose \
+	  -os="linux darwin windows"  -arch="arm64 amd64 386" -verbose \
 	  -output="./dist/{{.Dir}}_{{.OS}}_{{.Arch}}" ./cmd/
 
 push:
@@ -66,6 +66,11 @@ test:
 
 cover:
 	go tool cover -func=coverage-all.out
+
+init:
+	go mod init
+	go mod tidy
+
 
 .PHONY: \
 	build \
